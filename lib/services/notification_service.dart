@@ -202,22 +202,20 @@ class NotificationService {
       final daysBefore = await _getNotificationDaysBefore();
       final notificationTime = await _getNotificationTime();
 
-      // Hedef tarihe kaç gün kaldığını hesaplayalım
+      // Sadece tarihleri kullanarak (saat olmadan) gün farkını hesaplayalım
       final today = DateTime(now.year, now.month, now.day);
-      final scheduleDay =
+      final targetDate =
           DateTime(scheduledDate.year, scheduledDate.month, scheduledDate.day);
-      final difference = scheduleDay.difference(today).inDays;
+      final daysUntilTarget = targetDate.difference(today).inDays;
 
       debugPrint(
-          'Hedef tarih: $scheduleDay, Bugün: $today, Fark: $difference gün, Bildirim: $daysBefore gün önce');
+          'HEDEF TARİH: $targetDate, BUGÜN: $today, KALAN GÜN: $daysUntilTarget, BİLDİRİM GÜNÜ: $daysBefore gün önce');
 
-      // Özel zamanlı bildirim mi, yoksa ayarlarda belirlenen zamana göre mi?
+      // Özel test zamanlı bildirim mi yoksa normal ayarlanmış bildirim mi?
       if (useCustomTime) {
         // Test bildirimleri için özel zaman kullan
-        // TZDateTime kullanarak yerel saat dilimine göre hesaplayalım
         final zonedTime = tz.TZDateTime.from(scheduledDate, tz.local);
 
-        // Geçmiş bir zamana bildirim planlanıyorsa
         if (zonedTime.isBefore(tz.TZDateTime.now(tz.local))) {
           debugPrint(
               'Geçmiş zaman tespit edildi, bildirim 5 saniye sonra gösterilecek');
@@ -228,52 +226,74 @@ class NotificationService {
           _scheduleExactNotification(id, title, body, zonedTime, type);
         }
       } else {
-        // Kullanıcının ayarladığı bildirim günleri için işlem yapalım
+        // Normal bildirim mantığı: Birden çok gün bildirim göndermek için
 
-        // Eğer bugün (difference günü) bildirim günleri içindeyse
-        if (0 <= difference && difference <= daysBefore) {
-          // Bugün bir bildirim gösterilmeli
-          _scheduleNotificationForToday(
-              id, title, body, notificationTime, type);
+        // Eğer tarih, bildirim gün sayısı içindeyse bildirimler gönderilsin
+        // Örnek: Hedef tarih 3 gün sonra, ve kullanıcı 3 gün önce bildirim istemiş
+        // Bu durumda bildirimler şu günlerde gönderilmeli: Bugün (3 gün kala), Yarın (2 gün kala), 2 gün sonra (1 gün kala)
+
+        debugPrint(
+            'Normal bildirim planlanıyor. daysUntilTarget = $daysUntilTarget, daysBefore = $daysBefore');
+
+        // Eğer hedef tarih, şu andan daysBefore gün veya daha az ilerideyse
+        // bugünden başlayarak her gün bildirim göstermeliyiz
+        if (daysUntilTarget <= daysBefore) {
+          // Bugünden başlayarak, hedef güne kadar her gün bildirim göster
+          // 0 = bugün, 1 = yarın, 2 = 2 gün sonra... şeklinde
+          for (int dayOffset = 0; dayOffset <= daysUntilTarget; dayOffset++) {
+            // O gün için bildirimi planla
+            final notificationDay = today.add(Duration(days: dayOffset));
+
+            // Her gün için benzersiz ID oluştur
+            final uniqueId = id + (dayOffset * 1000);
+
+            // O gün ve kullanıcının seçtiği saat için bildirimi planla
+            final notificationDateTime = DateTime(
+              notificationDay.year,
+              notificationDay.month,
+              notificationDay.day,
+              notificationTime.hour,
+              notificationTime.minute,
+            );
+
+            final zonedTime =
+                tz.TZDateTime.from(notificationDateTime, tz.local);
+
+            // Eğer belirlenen saat geçmişse ve bugüne ait bir bildirimse
+            if (dayOffset == 0 &&
+                zonedTime.isBefore(tz.TZDateTime.now(tz.local))) {
+              // 5 saniye sonraya planla
+              debugPrint(
+                  'Bugünkü bildirim için saat geçmiş, 5 saniye sonra gösterilecek');
+              final immediateTime =
+                  tz.TZDateTime.now(tz.local).add(const Duration(seconds: 5));
+              _scheduleExactNotification(
+                  uniqueId, title, body, immediateTime, type);
+            } else {
+              _scheduleExactNotification(
+                  uniqueId, title, body, zonedTime, type);
+              debugPrint(
+                  'Bildirim planlandı: ${daysUntilTarget - dayOffset} gün kala - '
+                  'Tarih: ${notificationDay.day}.${notificationDay.month}.${notificationDay.year} '
+                  'Saat: ${notificationTime.hour}:${notificationTime.minute} (ID: $uniqueId)');
+            }
+          }
+        } else {
+          // Hedef tarih daysBefore günden daha uzak ise, bildirimleri daha sonra göstereceğiz
+          // Bu durumda şimdilik sadece hafızaya kaydedelim
           debugPrint(
-              'Bugün bildirim planlandı (kalan gün: $difference, bildirilecek gün: $daysBefore içinde)');
-        }
+              'Hedef tarih $daysUntilTarget gün sonra. Bildirim günlerinden ($daysBefore) daha uzak, şimdilik kaydediliyor.');
 
-        // Birden fazla gün bildirim göstermek için, her gün için farklı ID'lerle bildirim planla
-        // daysBefore günden başlayarak geriye doğru say ve her gün için ayrı bildirim oluştur
-        for (int i = daysBefore; i > 0; i--) {
-          // Eğer bugünkü bildirim zaten yukarıda planlandıysa atlayalım
-          if (difference == i) continue;
-
-          // Hedef tarihten i gün öncesi için bir bildirim planla
-          final notificationDay = scheduleDay.subtract(Duration(days: i));
-
-          // Eğer bildirim günü bugünden önceyse, bu günü atlayalım
-          if (notificationDay.isBefore(today)) continue;
-
-          // Her gün için benzersiz ID oluştur (temel ID + gün offseti)
-          final uniqueId = id + (i * 1000);
-
-          // O gün için bildirimi planla
-          final notificationDateTime = DateTime(
-            notificationDay.year,
-            notificationDay.month,
-            notificationDay.day,
+          // Yine de bildirimin kaydını tutalım
+          final scheduledDateTime = DateTime(
+            targetDate.year,
+            targetDate.month,
+            targetDate.day,
             notificationTime.hour,
             notificationTime.minute,
           );
 
-          final zonedTime = tz.TZDateTime.from(notificationDateTime, tz.local);
-
-          // Eğer bu zaman geçmişte kaldıysa, atlayalım
-          if (zonedTime.isBefore(tz.TZDateTime.now(tz.local))) {
-            debugPrint('$i gün öncesi için bildirim zamanı geçmiş, atlanıyor');
-            continue;
-          }
-
-          _scheduleExactNotification(uniqueId, title, body, zonedTime, type);
-          debugPrint(
-              '$i gün öncesi için bildirim planlandı: $notificationDay (ID: $uniqueId)');
+          _saveScheduledNotification(id, title, body, scheduledDateTime, type);
         }
       }
     } catch (e) {
@@ -410,6 +430,11 @@ class NotificationService {
       // Tüm bildirimleri iptal edelim (temiz başlangıç)
       await _notifications.cancelAll();
 
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final notificationTime = await _getNotificationTime();
+      final daysBefore = await _getNotificationDaysBefore();
+
       // Her bir bildirimi yeniden planlayalım
       for (final notificationData in notifications) {
         final parts = notificationData.split('|');
@@ -422,16 +447,63 @@ class NotificationService {
             DateTime.fromMillisecondsSinceEpoch(int.tryParse(parts[3]) ?? 0);
         final type = parts[4];
 
-        // Sadece gelecekteki bildirimleri yeniden planla
-        if (scheduledDate.isAfter(DateTime.now())) {
-          await showNotification(
-            id: id,
-            title: title,
-            body: body,
-            scheduledDate: scheduledDate,
-            type: type,
-            useCustomTime: true,
-          );
+        // Hedef tarihin sadece gün/ay/yıl kısmını kullan
+        final targetDate = DateTime(
+            scheduledDate.year, scheduledDate.month, scheduledDate.day);
+
+        // Hedef tarih bugünden sonra ise bildirimleri yeniden planlayalım
+        if (targetDate.isAfter(today) || targetDate.isAtSameMomentAs(today)) {
+          // Gün farkını hesapla
+          final daysUntilTarget = targetDate.difference(today).inDays;
+
+          debugPrint(
+              'Eski bildirimi yeniden planlama: ID=$id, Hedef=$targetDate, Kalan=$daysUntilTarget gün');
+
+          // Eğer hedef tarih, bildirim gün sayısı içindeyse bildirimleri oluştur
+          if (daysUntilTarget <= daysBefore) {
+            // Bugünden başlayarak, hedef güne kadar (dahil) her gün bildirim planla
+            for (int dayOffset = 0; dayOffset <= daysUntilTarget; dayOffset++) {
+              final notificationDay = today.add(Duration(days: dayOffset));
+              final uniqueId = id + (dayOffset * 1000);
+
+              final notificationDateTime = DateTime(
+                notificationDay.year,
+                notificationDay.month,
+                notificationDay.day,
+                notificationTime.hour,
+                notificationTime.minute,
+              );
+
+              final zonedTime =
+                  tz.TZDateTime.from(notificationDateTime, tz.local);
+
+              // Bugün için ve saat geçtiyse, 5 saniye sonraya planla
+              if (dayOffset == 0 &&
+                  zonedTime.isBefore(tz.TZDateTime.now(tz.local))) {
+                final immediateTime =
+                    tz.TZDateTime.now(tz.local).add(const Duration(seconds: 5));
+                _scheduleExactNotification(
+                    uniqueId, title, body, immediateTime, type);
+
+                debugPrint(
+                    'Geçmiş saatli bugünkü bildirim hemen planlandı: ID=$uniqueId');
+              } else {
+                _scheduleExactNotification(
+                    uniqueId, title, body, zonedTime, type);
+
+                debugPrint('Yeniden planlanan bildirim: ID=$uniqueId, '
+                    '${daysUntilTarget - dayOffset} gün kala (${notificationDay.day}.${notificationDay.month})');
+              }
+            }
+          } else {
+            // Henüz bildirim zamanı gelmemiş, tekrar kaydet
+            _saveScheduledNotification(id, title, body, scheduledDate, type);
+            debugPrint(
+                'Hedef tarih ($daysUntilTarget gün) bildirim zamanından uzak, tekrar kaydedildi.');
+          }
+        } else {
+          debugPrint(
+              'Geçmiş tarihli bildirim atlandı: ID=$id, Tarih=$scheduledDate');
         }
       }
 
@@ -572,19 +644,40 @@ class NotificationService {
         useCustomTime: true,
       );
 
-      // 4. Bugün için (1 gün önce) planlı bildirim testi
-      final tomorrow = DateTime.now().add(const Duration(days: 1));
+      // 4. Ayarlardaki günlük bildirim testi
+      final now = DateTime.now();
+      final daysBefore = await _getNotificationDaysBefore();
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
+
+      // Yarın için bildirim planla, kullanıcının gün ayarlarına göre
       await showNotification(
         id: 9996,
-        title: "Yarın için Planlı Ödeme Bildirimi",
+        title: "AYARLARA GÖRE BİLDİRİM TESTİ",
         body:
-            "Bu bildirim yarın (${tomorrow.day}.${tomorrow.month}.${tomorrow.year}) için planlanmış bir ödeme bildirimini simüle eder. Bugün gösterilmelidir.",
+            "Bu bildirim yarın (${tomorrow.day}.${tomorrow.month}) için bir ödeme bildirimidir. "
+            "Eğer ayarlarda $daysBefore gün seçtiyseniz ve bugün gösteriliyorsa, sistem doğru çalışıyor.",
         scheduledDate: tomorrow,
+        type: 'payment',
+        // useCustomTime false olduğu için kullanıcının ayarlarına göre bildirim zamanlanır
+      );
+
+      // 5. Özel olarak tam 3 gün sonra için bildirim - belirlenen gün sayısına göre test
+      final threeDaysLater = DateTime(now.year, now.month, now.day + 3);
+      await showNotification(
+        id: 9995,
+        title: "3 GÜN SONRA İÇİN BİLDİRİM",
+        body: "Bu bildirim 3 gün sonra olan bir ödeme için test. "
+            "Ayarlarda seçilen gün sayısına göre her gün tekrarlayacak şekilde planlandı.",
+        scheduledDate: threeDaysLater,
         type: 'payment',
       );
 
-      debugPrint(
-          "Test bildirimleri oluşturuldu: Anlık, 30 saniye sonra, 1 dakika sonra ve Yarın bildirimi");
+      debugPrint("Test bildirimleri oluşturuldu:\n"
+          "1. Anlık bildirim\n"
+          "2. 30 saniye sonra bildirim\n"
+          "3. 1 dakika sonra bildirim\n"
+          "4. Yarın için bildirim (ayarlara göre bugün gösterilir veya gösterilmez)\n"
+          "5. 3 gün sonra için bildirim (ayarlara göre her gün bildirim gösterilir)");
     } catch (e) {
       debugPrint('Bildirim testleri çalıştırılırken hata: $e');
     }

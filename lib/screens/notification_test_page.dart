@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationTestPage extends StatelessWidget {
   const NotificationTestPage({super.key});
@@ -240,6 +241,59 @@ class NotificationTestPage extends StatelessWidget {
               },
               child: const Text('ÇOK GÜNLÜ BİLDİRİM TESTİ (5 GÜN SONRA)'),
             ),
+            const SizedBox(height: 16),
+            // Yeni "Senaryo testi" butonu - özellikle çoklu gün bildirimleri için
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                // Kullanıcı ayarlarını alma
+                final prefs = await SharedPreferences.getInstance();
+                final hour = prefs.getInt('notificationTimeHour') ?? 9;
+                final minute = prefs.getInt('notificationTimeMinute') ?? 0;
+                final daysBefore = prefs.getInt('notificationDaysBefore') ?? 3;
+
+                // Ayın 11'i için ödeme oluşturma (Örnek senaryo)
+                final now = DateTime.now();
+
+                // Bugünden 3 gün sonra için ödeme planla
+                final targetDay = now.day + 3;
+                final paymentDate = DateTime(
+                  now.year,
+                  now.month,
+                  targetDay, // şu andan 3 gün sonra
+                );
+
+                // Bildirim oluştur
+                NotificationService.instance.showNotification(
+                  id: 9000,
+                  title: 'ÖZEL SENARYO TESTİ',
+                  body: 'Bu bildirim, ayarlarınıza göre her gün gösterilecek: '
+                      'Hedef: ${paymentDate.day}.${paymentDate.month}.${paymentDate.year}, '
+                      'Ayar: $daysBefore gün önce, Saat: $hour:$minute',
+                  scheduledDate: paymentDate,
+                  type: 'payment',
+                );
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'ÖZEL SENARYO TEST EDİLİYOR:\n'
+                      '✓ Ayarlarınız: $daysBefore gün önce, Saat: $hour:$minute\n'
+                      '✓ Hedef Tarih: ${paymentDate.day}.${paymentDate.month}.${paymentDate.year}\n'
+                      '✓ Bugünün Tarihi: ${now.day}.${now.month}.${now.year}\n'
+                      '✓ Kalan Gün: ${paymentDate.difference(DateTime(now.year, now.month, now.day)).inDays} gün\n\n'
+                      'Ayarlarınıza göre ${daysBefore} gün boyunca her gün bildirim almalısınız!',
+                    ),
+                    duration: const Duration(seconds: 8),
+                  ),
+                );
+              },
+              child: const Text('ÖZEL SENARYO TESTİ (3 GÜN SONRASI)'),
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
