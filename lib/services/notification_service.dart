@@ -119,21 +119,43 @@ class NotificationService {
         final notificationTime = await _getNotificationTime();
         final daysBefore = await _getNotificationDaysBefore();
 
-        targetDate = DateTime(
-          scheduledDate.year,
-          scheduledDate.month,
-          scheduledDate.day - daysBefore,
-          notificationTime.hour,
-          notificationTime.minute,
-        );
+        // Bugünün tarihini alıp, bildirim zamanını ayarlayalım
+        final today = DateTime.now();
+        // Hedef tarihe kaç gün kaldığını hesaplayalım
+        final difference = scheduledDate.difference(today).inDays;
 
-        // Eğer hedef zaman geçmişse, bir sonraki güne ayarla
-        if (targetDate.isBefore(DateTime.now())) {
-          targetDate = targetDate.add(const Duration(days: 1));
+        // Eğer bildirim hedef tarihten X gün önce gösterilecekse ve
+        // bugün + daysBefore günü hedef tarihe eşit veya daha küçükse bildirim gösterilmeli
+        if (difference <= daysBefore) {
+          // Bugün bildirim gösterilmeli, zamanı ayarlayalım
+          targetDate = DateTime(
+            today.year,
+            today.month,
+            today.day,
+            notificationTime.hour,
+            notificationTime.minute,
+          );
+
+          // Eğer belirlenen saat geçtiyse, bildirim hemen gösterilsin
+          if (targetDate.isBefore(today)) {
+            targetDate = today.add(const Duration(minutes: 1));
+          }
+        } else {
+          // Gelecekteki bir tarih için bildirim planla
+          targetDate = DateTime(
+            scheduledDate.year,
+            scheduledDate.month,
+            scheduledDate.day - daysBefore, // X gün önce
+            notificationTime.hour,
+            notificationTime.minute,
+          );
         }
       }
 
       final zonedTime = tz.TZDateTime.from(targetDate, tz.local);
+
+      debugPrint(
+          'Bildirim planlanıyor - Hedef Tarih: $scheduledDate, Bildirim Tarihi: $targetDate');
 
       await _notifications.zonedSchedule(
         id,
@@ -202,5 +224,47 @@ class NotificationService {
 
   Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();
+  }
+
+  // Zamanlanmış bildirim testi için
+  Future<void> testScheduledNotification() async {
+    // 1. Hemen gösterilecek bir bildirim
+    await showInstantNotification(
+      id: 9999,
+      title: "Anlık Bildirim Testi",
+      body: "Bu bir anlık bildirim testidir. Şimdi gösterilmelidir.",
+    );
+
+    // 2. 1 dakika sonra gösterilecek bir bildirim
+    final oneMinuteLater = DateTime.now().add(const Duration(minutes: 1));
+    await showNotification(
+      id: 9998,
+      title: "1 Dakika Sonra Bildirim",
+      body:
+          "Bu bildirim 1 dakika sonra gösterilmelidir. Saat: ${oneMinuteLater.hour}:${oneMinuteLater.minute}",
+      scheduledDate: oneMinuteLater,
+      useCustomTime: true,
+    );
+
+    // 3. Bugünün belirli bir saatinde gösterilecek bildirim
+    final todayAt = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+      DateTime.now().hour,
+      DateTime.now().minute + 2, // Şimdiden 2 dakika sonra
+    );
+
+    await showNotification(
+      id: 9997,
+      title: "Bugün için Planlı Bildirim",
+      body:
+          "Bu bildirim belirlenen saatte gösterilmelidir: ${todayAt.hour}:${todayAt.minute}",
+      scheduledDate: todayAt,
+      useCustomTime: true,
+    );
+
+    debugPrint(
+        "Test bildirimleri oluşturuldu: Anlık, 1 dakika sonra ve Bugün ${todayAt.hour}:${todayAt.minute}");
   }
 }

@@ -133,6 +133,24 @@ class NotificationTestPage extends StatelessWidget {
               },
               child: const Text('Tüm Bildirimleri İptal Et'),
             ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              ),
+              onPressed: () {
+                // Yeni test metodunu çağırıyoruz
+                NotificationService.instance.testScheduledNotification();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Üç farklı bildirim testi başlatıldı!'),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              },
+              child: const Text('Tüm Bildirim Testlerini Çalıştır'),
+            ),
           ],
         ),
       ),
