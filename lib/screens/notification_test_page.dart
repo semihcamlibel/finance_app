@@ -200,6 +200,46 @@ class NotificationTestPage extends StatelessWidget {
               },
               child: const Text('Tüm Bildirim Testlerini Çalıştır'),
             ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade700,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                // 5 gün sonrası için bir ödeme planla
+                final now = DateTime.now();
+                final futureDate = DateTime(
+                  now.year,
+                  now.month,
+                  now.day + 5, // 5 gün sonra
+                  10, // Saat 10:00'da
+                  0,
+                );
+
+                NotificationService.instance.showNotification(
+                  id: 7000,
+                  title: '5 GÜN SONRA ÖDEME',
+                  body:
+                      'Bu bildirim, ayarlarda seçili her gün için gösterilecek şekilde planlandı.',
+                  scheduledDate: futureDate,
+                  type: 'payment',
+                  // useCustomTime: false varsayılanı kullanılıyor,
+                  // böylece ayarlardaki gün sayısına göre bildirimler oluşturulacak
+                );
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '5 gün sonrası (${futureDate.day}.${futureDate.month}) için ödeme bildirimi planlandı.\n'
+                      'Ayarlarda seçtiğiniz gün sayısına göre her gün bildirim alacaksınız.',
+                    ),
+                    duration: const Duration(seconds: 5),
+                  ),
+                );
+              },
+              child: const Text('ÇOK GÜNLÜ BİLDİRİM TESTİ (5 GÜN SONRA)'),
+            ),
           ],
         ),
       ),
