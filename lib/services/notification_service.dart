@@ -1,4 +1,4 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter/material.dart';
@@ -8,64 +8,34 @@ class NotificationService {
   static final NotificationService _instance = NotificationService._();
   static NotificationService get instance => _instance;
 
-  final FlutterLocalNotificationsPlugin _notifications =
-      FlutterLocalNotificationsPlugin();
-
   NotificationService._();
 
   Future<void> initialize() async {
     tz.initializeTimeZones();
 
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-
-    const settings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
-    await _notifications.initialize(
-      settings,
-      onDidReceiveNotificationResponse: (details) {
-        // Bildirime tıklandığında yapılacak işlemler
-      },
+    await AwesomeNotifications().initialize(
+      'resource://drawable/ic_launcher',
+      [
+        NotificationChannel(
+          channelKey: 'finance_app_channel',
+          channelName: 'Finans Bildirimleri',
+          channelDescription: 'Finans uygulaması bildirimleri',
+          defaultColor: Colors.blue,
+          importance: NotificationImportance.High,
+          channelShowBadge: true,
+          enableVibration: true,
+          playSound: true,
+        ),
+      ],
     );
 
     // Android için bildirim izni kontrolü
-    final platform = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    if (platform != null) {
-      // Eski sürümlerde requestNotificationsPermission() metodu yok,
-      // bu özelliğin yerine AndroidManifest.xml'de izinlerin tanımlanması gerekiyor
-      debugPrint(
-          'Android bildirim izinleri AndroidManifest.xml üzerinden kontrol edilmeli');
+    final isAllowed = await AwesomeNotifications().isNotificationAllowed();
+    if (!isAllowed) {
+      debugPrint('Bildirim izni alınacak');
+      // Burada izin isteme işlemini yapabilirsiniz
+      // await AwesomeNotifications().requestPermissionToSendNotifications();
     }
-  }
-
-  NotificationDetails get _notificationDetails {
-    return const NotificationDetails(
-      android: AndroidNotificationDetails(
-        'finance_app_channel',
-        'Finans Bildirimleri',
-        channelDescription: 'Finans uygulaması bildirimleri',
-        importance: Importance.high,
-        priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
-        enableVibration: true,
-        playSound: true,
-        channelShowBadge: true,
-      ),
-      iOS: DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      ),
-    );
   }
 
   Future<bool> _shouldShowNotification(String type) async {
@@ -133,19 +103,18 @@ class NotificationService {
         }
       }
 
-      final zonedTime = tz.TZDateTime.from(targetDate, tz.local);
-
-      await _notifications.zonedSchedule(
-        id,
-        title,
-        body,
-        zonedTime,
-        _notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: id,
+          channelKey: 'finance_app_channel',
+          title: title,
+          body: body,
+          notificationLayout: NotificationLayout.Default,
+        ),
+        schedule: NotificationCalendar.fromDate(date: targetDate),
       );
-      debugPrint('Bildirim başarıyla planlandı: $zonedTime');
+
+      debugPrint('Bildirim başarıyla planlandı: $targetDate');
     } catch (e) {
       debugPrint('Bildirim planlanırken hata oluştu: $e');
     }
@@ -184,12 +153,16 @@ class NotificationService {
         return;
       }
 
-      await _notifications.show(
-        id,
-        title,
-        body,
-        _notificationDetails,
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: id,
+          channelKey: 'finance_app_channel',
+          title: title,
+          body: body,
+          notificationLayout: NotificationLayout.Default,
+        ),
       );
+
       debugPrint('Anlık bildirim başarıyla gönderildi');
     } catch (e) {
       debugPrint('Anlık bildirim gönderilirken hata oluştu: $e');
@@ -197,10 +170,10 @@ class NotificationService {
   }
 
   Future<void> cancelNotification(int id) async {
-    await _notifications.cancel(id);
+    await AwesomeNotifications().cancel(id);
   }
 
   Future<void> cancelAllNotifications() async {
-    await _notifications.cancelAll();
+    await AwesomeNotifications().cancelAll();
   }
 }
