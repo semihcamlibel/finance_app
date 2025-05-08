@@ -46,15 +46,64 @@ class NotificationTestPage extends StatelessWidget {
                 );
 
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
+                  SnackBar(
                     content: Text(
-                      'Ödeme bildirimi planlandı: Ayarlarda belirlenen saatte bildirim alacaksınız',
+                      'Ödeme bildirimi planlandı: Şu tarih için: ${tomorrow.day}.${tomorrow.month}.${tomorrow.year}',
                     ),
-                    duration: Duration(seconds: 3),
+                    duration: const Duration(seconds: 3),
                   ),
                 );
               },
               child: const Text('Yarın için Ödeme Bildirimi Planla'),
+            ),
+            const SizedBox(height: 16),
+            // Yeni test butonu: Tam 1 gün sonrası için planlama
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade700,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                final now = DateTime.now();
+                // Bugünün aynı saati ama yarın için (1 gün sonrası)
+                final tomorrow = DateTime(
+                  now.year,
+                  now.month,
+                  now.day + 1,
+                  now.hour,
+                  now.minute + 1, // Şu andan 1 dakika sonra
+                );
+
+                NotificationService.instance.showNotification(
+                  id: 6001,
+                  title: 'TAM 1 GÜN SONRA BİLDİRİM TESTİ',
+                  body:
+                      'Bu bildirim ${tomorrow.day}.${tomorrow.month}.${tomorrow.year} tarihinde ${tomorrow.hour}:${tomorrow.minute} saatinde gösterilecek',
+                  scheduledDate: tomorrow,
+                  type: 'payment',
+                  useCustomTime: true, // Tam belirtilen zamanda göster
+                );
+
+                // Aynı zamanda 1 gün geri sayımlı bir bildirim (bildirim ayarlarında "1 gün önce" seçili olmalı)
+                NotificationService.instance.showNotification(
+                  id: 6002,
+                  title: 'BİLDİRİM AYARI TESTİ (1 gün)',
+                  body:
+                      'Bu bildirim ayarlarda "1 gün önce" seçili ise şimdi gösterilmeli, yoksa gösterilmeyecek.',
+                  scheduledDate: tomorrow,
+                  type: 'payment',
+                );
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'İki bildirim planlandı:\n1. Tam yarın - ${tomorrow.hour}:${tomorrow.minute} için\n2. Ayarlarda seçili zaman için (1 gün önce olmalı)',
+                    ),
+                    duration: const Duration(seconds: 5),
+                  ),
+                );
+              },
+              child: const Text('TAM 1 GÜN SONRA ÖZELLEŞTİRİLMİŞ TEST'),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
