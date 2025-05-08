@@ -40,8 +40,10 @@ class NotificationService {
     final platform = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (platform != null) {
-      await platform.requestNotificationsPermission();
-      debugPrint('Android bildirim izinleri kontrol edildi');
+      // Eski sürümlerde requestNotificationsPermission() metodu yok,
+      // bu özelliğin yerine AndroidManifest.xml'de izinlerin tanımlanması gerekiyor
+      debugPrint(
+          'Android bildirim izinleri AndroidManifest.xml üzerinden kontrol edilmeli');
     }
   }
 
