@@ -5,6 +5,7 @@ import '../services/database_helper.dart';
 import '../models/transaction.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import 'notifications_list_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -79,16 +80,26 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ],
               ),
-              Container(
-                height: 40,
-                width: 40,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.notifications_none_outlined,
-                  color: AppTheme.primaryColor,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsListPage(),
+                    ),
+                  );
+                },
+                child: Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.notifications_none_outlined,
+                    color: AppTheme.primaryColor,
+                  ),
                 ),
               ),
             ],
