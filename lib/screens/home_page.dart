@@ -55,10 +55,7 @@ class _HomePageState extends State<HomePage> {
               title: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.asset(
-                    'assets/logo.png',
-                    height: 30,
-                  ),
+                  const Icon(Icons.account_balance_wallet),
                   const SizedBox(width: 8),
                   Text(_getAppBarTitle()),
                 ],
