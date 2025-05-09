@@ -3,9 +3,15 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_page.dart';
+import 'services/database_helper.dart';
 import 'services/notification_service.dart';
 import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
+
+// Yerelleştirme için yardımcı fonksiyon
+Future<void> initializeLocalization() async {
+  await initializeDateFormatting('tr_TR', null);
+}
 
 // Sayfa geçiş animasyonu için özel route sınıfı
 class CustomPageRoute<T> extends PageRouteBuilder<T> {
@@ -29,8 +35,16 @@ class CustomPageRoute<T> extends PageRouteBuilder<T> {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('tr_TR', null);
+
+  // Bildirimleri başlat
   await NotificationService.instance.initialize();
+
+  // Uygulamadaki dilleri yükle
+  await initializeLocalization();
+
+  // Süresiz tekrarlanan işlemleri kontrol et ve gerekirse yeni işlemler oluştur
+  await DatabaseHelper.instance.checkAndCreateFutureRecurringTransactions();
+
   runApp(const FinanceApp());
 }
 

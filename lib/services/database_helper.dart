@@ -504,6 +504,10 @@ class DatabaseHelper {
     );
     final mainId = await insertTransaction(mainTransaction);
 
+    final now = DateTime.now();
+    final int defaultFutureMonths = 12; // Varsayılan olarak 12 ay ileri oluştur
+
+    // Tekrarlanan işlemler oluştur
     if (transaction.recurringCount != null) {
       // Belirli sayıda tekrar
       for (int i = 1; i < transaction.recurringCount!; i++) {
@@ -532,6 +536,193 @@ class DatabaseHelper {
 
         await insertTransaction(recurringTransaction);
       }
+    } else {
+      // Süresiz tekrarlama (şimdilik önümüzdeki 12 ay/yıl için oluştur)
+      final repeats = transaction.recurringType == RecurringType.monthly
+          ? defaultFutureMonths
+          : 5; // Aylık için 12 ay, yıllık için 5 yıl
+
+      for (int i = 1; i < repeats; i++) {
+        DateTime nextDate;
+
+        if (transaction.recurringType == RecurringType.monthly) {
+          // Ayın son günü kontrolü
+          var year = transaction.date.year;
+          var month = transaction.date.month + i;
+
+          // Ay taşması durumunda yıl ayarlaması
+          while (month > 12) {
+            month -= 12;
+            year += 1;
+          }
+
+          // Ay sonundaki taşmaları kontrol et (örn. 31 Ocak -> 28/29 Şubat)
+          var day = transaction.date.day;
+          var lastDayOfMonth = DateTime(year, month + 1, 0).day;
+          if (day > lastDayOfMonth) {
+            day = lastDayOfMonth;
+          }
+
+          nextDate = DateTime(year, month, day);
+        } else {
+          // Yıllık tekrar
+          nextDate = DateTime(transaction.date.year + i, transaction.date.month,
+              transaction.date.day);
+        }
+
+        final recurringTransaction = FinanceTransaction(
+          title: transaction.title,
+          amount: transaction.amount,
+          date: nextDate,
+          type: transaction.type,
+          category: transaction.category,
+          description: transaction.description,
+          parentTransactionId: mainId,
+          remainingRecurrences: null, // Süresiz
+          recurringType: transaction.recurringType,
+          recurringCount: null, // Süresiz
+          isPaid: false,
+          paidDate: null,
+          isReceived: false,
+          receivedDate: null,
+        );
+
+        await insertTransaction(recurringTransaction);
+      }
+    }
+  }
+
+  // Otomatik süresiz tekrarlı işlemleri güncelleme
+  Future<void> checkAndCreateFutureRecurringTransactions() async {
+    final db = await database;
+    final now = DateTime.now();
+
+    // Süresiz tekrarlayan ana işlemleri bul (recurringCount = null ve parentTransactionId = null)
+    final List<Map<String, dynamic>> recurringParentMaps = await db.query(
+      'transactions',
+      where:
+          'recurringType > 0 AND recurringCount IS NULL AND parentTransactionId IS NULL',
+    );
+
+    if (recurringParentMaps.isEmpty) return;
+
+    for (var parentMap in recurringParentMaps) {
+      final parentTransaction = FinanceTransaction.fromMap(parentMap);
+      final String parentId = parentTransaction.id;
+
+      // En geç tarihli tekrarlayan işlemi bul
+      final List<Map<String, dynamic>> latestTransactionMap = await db.query(
+          'transactions',
+          where: 'parentTransactionId = ?',
+          whereArgs: [parentId],
+          orderBy: 'date DESC',
+          limit: 1);
+
+      if (latestTransactionMap.isEmpty) continue;
+
+      final latestTransaction =
+          FinanceTransaction.fromMap(latestTransactionMap.first);
+      final DateTime latestDate = latestTransaction.date;
+
+      // Eğer en son işlem 6 ay içindeyse, daha fazla işlem oluştur
+      final int monthsToAdd = 6; // 6 ay daha işlem oluştur
+
+      if (parentTransaction.recurringType == RecurringType.monthly) {
+        final futureLimit =
+            DateTime(now.year, now.month + monthsToAdd, now.day);
+
+        if (latestDate.isBefore(futureLimit)) {
+          // Ek işlemler oluştur
+          int i = 1;
+          DateTime nextDate =
+              _getNextRecurringDate(latestDate, RecurringType.monthly);
+
+          while (nextDate.isBefore(futureLimit)) {
+            final recurringTransaction = FinanceTransaction(
+              title: parentTransaction.title,
+              amount: parentTransaction.amount,
+              date: nextDate,
+              type: parentTransaction.type,
+              category: parentTransaction.category,
+              description: parentTransaction.description,
+              parentTransactionId: parentId,
+              remainingRecurrences: null,
+              recurringType: parentTransaction.recurringType,
+              recurringCount: null,
+              isPaid: false,
+              paidDate: null,
+              isReceived: false,
+              receivedDate: null,
+            );
+
+            await insertTransaction(recurringTransaction);
+
+            i++;
+            nextDate = _getNextRecurringDate(nextDate, RecurringType.monthly);
+          }
+        }
+      } else if (parentTransaction.recurringType == RecurringType.yearly) {
+        // Yıllık tekrarlama için benzer mantık
+        final futureLimit =
+            DateTime(now.year + 2, now.month, now.day); // 2 yıl daha
+
+        if (latestDate.isBefore(futureLimit)) {
+          // Ek işlemler oluştur
+          int i = 1;
+          DateTime nextDate =
+              _getNextRecurringDate(latestDate, RecurringType.yearly);
+
+          while (nextDate.isBefore(futureLimit)) {
+            final recurringTransaction = FinanceTransaction(
+              title: parentTransaction.title,
+              amount: parentTransaction.amount,
+              date: nextDate,
+              type: parentTransaction.type,
+              category: parentTransaction.category,
+              description: parentTransaction.description,
+              parentTransactionId: parentId,
+              remainingRecurrences: null,
+              recurringType: parentTransaction.recurringType,
+              recurringCount: null,
+              isPaid: false,
+              paidDate: null,
+              isReceived: false,
+              receivedDate: null,
+            );
+
+            await insertTransaction(recurringTransaction);
+
+            i++;
+            nextDate = _getNextRecurringDate(nextDate, RecurringType.yearly);
+          }
+        }
+      }
+    }
+  }
+
+  // Bir sonraki tekrarlama tarihini hesaplama yardımcı metodu
+  DateTime _getNextRecurringDate(DateTime currentDate, RecurringType type) {
+    if (type == RecurringType.monthly) {
+      var year = currentDate.year;
+      var month = currentDate.month + 1;
+
+      // Ay taşması durumunda yıl ayarlaması
+      if (month > 12) {
+        month = 1;
+        year += 1;
+      }
+
+      // Ayın son günü kontrolü
+      var day = currentDate.day;
+      var lastDayOfMonth = DateTime(year, month + 1, 0).day;
+      if (day > lastDayOfMonth) {
+        day = lastDayOfMonth;
+      }
+
+      return DateTime(year, month, day);
+    } else {
+      // RecurringType.yearly
+      return DateTime(currentDate.year + 1, currentDate.month, currentDate.day);
     }
   }
 
