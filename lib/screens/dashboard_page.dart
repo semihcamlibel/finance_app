@@ -348,12 +348,16 @@ class DashboardPageState extends State<DashboardPage> {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              _hideAmounts ? '*****' : currencyFormat.format(amount),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: color,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _hideAmounts ? '*****' : currencyFormat.format(amount),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: color,
+                ),
               ),
             ),
           ],
@@ -430,12 +434,16 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             const SizedBox(height: 20),
-            Text(
-              _hideAmounts ? '*****' : currencyFormat.format(balance),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 28,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _hideAmounts ? '*****' : currencyFormat.format(balance),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 28,
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -578,15 +586,20 @@ class DashboardPageState extends State<DashboardPage> {
                             ],
                           ),
                         ),
-                        Text(
-                          _hideAmounts
-                              ? '****'
-                              : currencyFormat.format(transaction.amount),
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.errorColor,
-                                  ),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _hideAmounts
+                                ? '****'
+                                : currencyFormat.format(transaction.amount),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.errorColor,
+                                ),
+                          ),
                         ),
                       ],
                     ),
@@ -815,12 +828,15 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
           ),
-          Text(
-            _hideAmounts ? '****' : currencyFormat.format(transaction.amount),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              _hideAmounts ? '****' : currencyFormat.format(transaction.amount),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+            ),
           ),
         ],
       ),
