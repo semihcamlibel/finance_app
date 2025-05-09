@@ -968,6 +968,8 @@ class DatabaseHelper {
     // Her kategori için harcamaları hesapla
     for (var category in budgets.keys) {
       final budget = budgets[category] ?? 0;
+
+      // Kategoriye ait tüm gider ve ödeme işlemlerini topla
       final expense = transactions
           .where((t) =>
               (t.type == TransactionType.expense ||
@@ -978,6 +980,10 @@ class DatabaseHelper {
               (sum, t) =>
                   sum + t.amount.abs()); // Her zaman pozitif değerleri topla
 
+      // Debug için yazdır
+      print(
+          'Kategori: ${_getCategoryName(category)}, Bütçe: $budget, Harcama: $expense');
+
       if (expense > budget) {
         overBudgetCategories.add({
           'category': category,
@@ -985,10 +991,40 @@ class DatabaseHelper {
           'expense': expense,
           'overspend': expense - budget,
         });
+
+        // Bütçe aşımı tespit edildi
+        print(
+            'BÜTÇE AŞIMI BULUNDU: ${_getCategoryName(category)}, Aşım: ${expense - budget}');
       }
     }
 
     return overBudgetCategories;
+  }
+
+  // Kategori adını almak için yardımcı metot
+  String _getCategoryName(TransactionCategory category) {
+    switch (category) {
+      case TransactionCategory.salary:
+        return 'Maaş';
+      case TransactionCategory.investment:
+        return 'Yatırım';
+      case TransactionCategory.shopping:
+        return 'Alışveriş';
+      case TransactionCategory.bills:
+        return 'Faturalar';
+      case TransactionCategory.food:
+        return 'Yemek';
+      case TransactionCategory.transport:
+        return 'Ulaşım';
+      case TransactionCategory.health:
+        return 'Sağlık';
+      case TransactionCategory.education:
+        return 'Eğitim';
+      case TransactionCategory.entertainment:
+        return 'Eğlence';
+      case TransactionCategory.other:
+        return 'Diğer';
+    }
   }
 
   static NumberFormat getCurrencyFormat(String currencySymbol) {

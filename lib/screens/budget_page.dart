@@ -45,6 +45,9 @@ class _BudgetPageState extends State<BudgetPage> {
   }
 
   Future<void> _loadBudgetData() async {
+    setState(() {
+      _isLoading = true;
+    });
     await _loadBudgets();
     await _loadExpenses();
     setState(() {
@@ -59,7 +62,6 @@ class _BudgetPageState extends State<BudgetPage> {
       _budgets.clear();
       _budgets.addAll(budgets);
     });
-    _checkBudgetOverruns();
   }
 
   Future<void> _checkBudgetOverruns() async {
@@ -118,26 +120,35 @@ class _BudgetPageState extends State<BudgetPage> {
   }
 
   Future<void> _loadExpenses() async {
+    // Veritabanından seçili ay ve yıl için tüm işlemleri al
     final transactions = await DatabaseHelper.instance.getTransactionsByDate(
       DateTime(_selectedYear, _selectedMonth),
     );
 
+    // Kategorilere göre harcamaları hesapla
     final Map<TransactionCategory, double> expenses = {};
+
     for (var transaction in transactions) {
+      // Gider veya ödeme türündeki işlemleri dikkate al
       if (transaction.type == TransactionType.expense ||
           transaction.type == TransactionType.payment) {
-        final amount = transaction.amount.abs(); // Her zaman pozitif değeri al
+        final amount =
+            transaction.amount.abs(); // Mutlak değeri kullan (pozitif sayı)
         expenses[transaction.category] =
             (expenses[transaction.category] ?? 0) + amount;
       }
     }
 
+    // Debug için harcamaları yazdır
+    print('Hesaplanan harcamalar: $expenses');
+
+    // State'i güncelle
     setState(() {
       _expenses = expenses;
     });
 
-    // Veri tekrar yüklendikten sonra bütçe aşımlarını kontrol et
-    _checkBudgetOverruns();
+    // Bütçe aşımlarını kontrol et
+    await _checkBudgetOverruns();
   }
 
   void _showAddBudgetDialog(TransactionCategory category) {
@@ -174,7 +185,7 @@ class _BudgetPageState extends State<BudgetPage> {
                 );
                 if (mounted) {
                   Navigator.pop(context);
-                  _loadBudgets();
+                  await _loadBudgetData(); // Tam veri yenileme
                 }
               }
             },
@@ -190,18 +201,20 @@ class _BudgetPageState extends State<BudgetPage> {
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildMonthSelector(),
-            const SizedBox(height: 24),
-            _buildBudgetSummary(),
-            const SizedBox(height: 24),
-            _buildCategoryBudgets(),
-            const SizedBox(height: 24),
-            _buildBudgetAnalysis(),
-          ],
-        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildMonthSelector(),
+                  const SizedBox(height: 24),
+                  _buildBudgetSummary(),
+                  const SizedBox(height: 24),
+                  _buildCategoryBudgets(),
+                  const SizedBox(height: 24),
+                  _buildBudgetAnalysis(),
+                ],
+              ),
       ),
     );
   }
@@ -224,7 +237,7 @@ class _BudgetPageState extends State<BudgetPage> {
                     _selectedMonth--;
                   }
                 });
-                _loadExpenses();
+                _loadBudgetData();
               },
             ),
             Text(
@@ -243,7 +256,7 @@ class _BudgetPageState extends State<BudgetPage> {
                     _selectedMonth++;
                   }
                 });
-                _loadExpenses();
+                _loadBudgetData();
               },
             ),
           ],
@@ -772,7 +785,7 @@ class _BudgetPageState extends State<BudgetPage> {
         _selectedMonth,
         _selectedYear,
       );
-      _loadBudgets();
+      await _loadBudgetData(); // Tam veri yenileme
     }
   }
 }
