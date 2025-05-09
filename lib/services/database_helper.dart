@@ -211,13 +211,41 @@ class DatabaseHelper {
   // Belirli bir tarihe göre işlemleri getirme
   Future<List<FinanceTransaction>> getTransactionsByDate(DateTime date) async {
     final db = await database;
+
+    // Yıl ve ay bilgilerini al
+    final year = date.year;
+    final month = date.month.toString().padLeft(2, '0');
+    final pattern = '$year-$month%'; // "YYYY-MM%" formatında arama
+
+    print('Tarih sorgusu için arama deseni: $pattern');
+
+    // İşlemleri getir
     final List<Map<String, dynamic>> maps = await db.query(
       'transactions',
       where: 'date LIKE ?',
-      whereArgs: ['${date.year}-${date.month.toString().padLeft(2, '0')}%'],
+      whereArgs: [pattern],
     );
-    return List.generate(
-        maps.length, (i) => FinanceTransaction.fromMap(maps[i]));
+
+    print('Bulunan işlem sayısı: ${maps.length}');
+
+    // İşlem listesini oluştur
+    final transactions =
+        List.generate(maps.length, (i) => FinanceTransaction.fromMap(maps[i]));
+
+    // Gider ve ödemeler hakkında bilgi logla
+    final expenses = transactions
+        .where((t) =>
+            t.type == TransactionType.expense ||
+            t.type == TransactionType.payment)
+        .toList();
+
+    print('Bulunan gider/ödeme işlem sayısı: ${expenses.length}');
+    for (var exp in expenses) {
+      print(
+          'İşlem: ${exp.title}, Tür: ${exp.type}, Kategori: ${_getCategoryName(exp.category)}, Tutar: ${exp.amount}');
+    }
+
+    return transactions;
   }
 
   // Belirli bir tipe göre işlemleri getirme

@@ -120,35 +120,64 @@ class _BudgetPageState extends State<BudgetPage> {
   }
 
   Future<void> _loadExpenses() async {
-    // Veritabanından seçili ay ve yıl için tüm işlemleri al
-    final transactions = await DatabaseHelper.instance.getTransactionsByDate(
-      DateTime(_selectedYear, _selectedMonth),
-    );
+    try {
+      print('\n-------------- YENİ BÜTÇE HESAPLAMASI --------------');
+      print('Seçili ay/yıl: $_selectedMonth/$_selectedYear');
 
-    // Kategorilere göre harcamaları hesapla
-    final Map<TransactionCategory, double> expenses = {};
+      // Veritabanından seçili ay ve yıl için tüm işlemleri al
+      final transactions = await DatabaseHelper.instance.getTransactionsByDate(
+        DateTime(_selectedYear, _selectedMonth),
+      );
 
-    for (var transaction in transactions) {
-      // Gider veya ödeme türündeki işlemleri dikkate al
-      if (transaction.type == TransactionType.expense ||
-          transaction.type == TransactionType.payment) {
-        final amount =
-            transaction.amount.abs(); // Mutlak değeri kullan (pozitif sayı)
-        expenses[transaction.category] =
-            (expenses[transaction.category] ?? 0) + amount;
+      // Kategorilere göre harcamaları hesapla
+      final Map<TransactionCategory, double> expenses = {};
+
+      print('--------- KATEGORİ BAZLI HARCAMA HESABI ---------');
+
+      // Her kategori için harcamaları sıfırla (tüm kategorileri kapsayacak şekilde)
+      for (var category in TransactionCategory.values) {
+        expenses[category] = 0.0;
       }
+
+      // Harcamaları topla
+      for (var transaction in transactions) {
+        // Gider veya ödeme türündeki işlemleri dikkate al
+        if (transaction.type == TransactionType.expense ||
+            transaction.type == TransactionType.payment) {
+          final amount =
+              transaction.amount.abs(); // Mutlak değeri kullan (pozitif sayı)
+          expenses[transaction.category] =
+              (expenses[transaction.category] ?? 0) + amount;
+
+          print(
+              '${_getCategoryText(transaction.category)} Kategorisine ${currencyFormat.format(amount)} harcama eklendi, Toplam: ${currencyFormat.format(expenses[transaction.category])}');
+        }
+      }
+
+      // Debug için harcamaları yazdır
+      print('\n----- KATEGORİ HARCAMA ÖZETİ -----');
+      TransactionCategory.values.forEach((category) {
+        final harcama = expenses[category] ?? 0.0;
+        final butce = _budgets[category] ?? 0.0;
+
+        if (harcama > 0 || butce > 0) {
+          print(
+              '${_getCategoryText(category)}: Bütçe=${currencyFormat.format(butce)}, Harcama=${currencyFormat.format(harcama)}, ${harcama > butce ? "AŞIM VAR" : "Normal"}');
+        }
+      });
+
+      // State'i güncelle
+      setState(() {
+        _expenses = expenses;
+      });
+
+      // Bütçe aşımlarını kontrol et
+      await _checkBudgetOverruns();
+
+      print('-------------- BÜTÇE HESAPLAMASI TAMAMLANDI --------------\n');
+    } catch (e) {
+      print('Harcamaları yüklerken hata: $e');
     }
-
-    // Debug için harcamaları yazdır
-    print('Hesaplanan harcamalar: $expenses');
-
-    // State'i güncelle
-    setState(() {
-      _expenses = expenses;
-    });
-
-    // Bütçe aşımlarını kontrol et
-    await _checkBudgetOverruns();
   }
 
   void _showAddBudgetDialog(TransactionCategory category) {
@@ -331,12 +360,95 @@ class _BudgetPageState extends State<BudgetPage> {
           ],
         ),
         const SizedBox(height: 16),
+
+        // Bütçesi olan kategorileri göster
         ...TransactionCategory.values.map((category) {
-          if (_budgets.containsKey(category)) {
+          final budget = _budgets[category] ?? 0;
+          final expense = _expenses[category] ?? 0;
+
+          // Eğer bu kategoride bütçe veya harcama varsa göster
+          if (budget > 0 || expense > 0) {
             return _buildBudgetCard(category);
           }
           return const SizedBox();
         }).toList(),
+
+        // Bütçesi olmayıp harcaması olan kategoriler için bilgi kartı
+        if (TransactionCategory.values.any((category) =>
+            (_budgets[category] ?? 0) == 0 && (_expenses[category] ?? 0) > 0))
+          Card(
+            margin: const EdgeInsets.only(top: 16, bottom: 8),
+            color: Colors.amber.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Text(
+                        'Bütçesi Olmayan Harcamalar',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Aşağıdaki kategorilerde bütçe ayarlanmadığı halde harcama var:',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  ...TransactionCategory.values
+                      .where((category) =>
+                          (_budgets[category] ?? 0) == 0 &&
+                          (_expenses[category] ?? 0) > 0)
+                      .map((category) => Padding(
+                            padding: const EdgeInsets.only(top: 4, bottom: 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(_getCategoryText(category)),
+                                Text(
+                                  currencyFormat
+                                      .format(_expenses[category] ?? 0),
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ))
+                      .toList(),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // Bu kategoriler için bütçe ekleme ekranını göster
+                      final firstCategory =
+                          TransactionCategory.values.firstWhere(
+                        (category) =>
+                            (_budgets[category] ?? 0) == 0 &&
+                            (_expenses[category] ?? 0) > 0,
+                        orElse: () => TransactionCategory.other,
+                      );
+                      _showAddBudgetDialog(firstCategory);
+                    },
+                    icon: const Icon(Icons.add_circle_outline),
+                    label: const Text('Bütçe Ekle'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
