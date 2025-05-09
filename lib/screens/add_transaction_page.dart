@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/transaction.dart';
 import '../services/database_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/account.dart';
 
 class AddTransactionPage extends StatefulWidget {
   final FinanceTransaction? transaction;
@@ -30,10 +31,16 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
   late NumberFormat currencyFormat;
   String _selectedCurrency = '₺';
 
+  // Hesap seçimi için
+  String? _selectedAccountId;
+  List<Account> _accounts = [];
+  bool _isLoadingAccounts = true;
+
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadAccounts();
     if (widget.transaction != null) {
       // Düzenleme modu
       _titleController.text = widget.transaction!.title;
@@ -43,6 +50,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
       _selectedType = widget.transaction!.type;
       _selectedCategory = widget.transaction!.category;
       _selectedRecurringType = widget.transaction!.recurringType;
+      _selectedAccountId = widget.transaction!.accountId;
       if (widget.transaction!.recurringCount != null) {
         _recurringCountController.text =
             widget.transaction!.recurringCount.toString();
@@ -55,6 +63,25 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
       _selectedType = TransactionType.expense;
       _selectedCategory = TransactionCategory.other;
       _selectedRecurringType = RecurringType.none;
+    }
+  }
+
+  Future<void> _loadAccounts() async {
+    setState(() {
+      _isLoadingAccounts = true;
+    });
+
+    try {
+      final accounts = await DatabaseHelper.instance.getActiveAccounts();
+      setState(() {
+        _accounts = accounts;
+        _isLoadingAccounts = false;
+      });
+    } catch (e) {
+      print('Hesaplar yüklenirken hata: $e');
+      setState(() {
+        _isLoadingAccounts = false;
+      });
     }
   }
 
@@ -95,7 +122,13 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
         final transaction = FinanceTransaction(
           id: widget.transaction?.id,
           title: _titleController.text,
-          amount: double.parse(_amountController.text.replaceAll(',', '.')),
+          amount: _selectedType == TransactionType.expense ||
+                  _selectedType == TransactionType.debt ||
+                  _selectedType == TransactionType.payment
+              ? -double.parse(_amountController.text
+                  .replaceAll(',', '.')) // Gider için negatif değer
+              : double.parse(_amountController.text
+                  .replaceAll(',', '.')), // Gelir için pozitif değer
           date: _selectedDate,
           type: _selectedType,
           category: _selectedCategory,
@@ -116,6 +149,9 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
               _showRecurringOptions && _recurringCountController.text.isNotEmpty
                   ? int.parse(_recurringCountController.text)
                   : null,
+          accountId: _selectedType == TransactionType.income
+              ? _selectedAccountId
+              : null,
         );
 
         if (widget.transaction != null) {
@@ -127,6 +163,38 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                 widget.transaction!.id, transaction);
           }
           await DatabaseHelper.instance.updateTransaction(transaction);
+
+          // Hesap bakiyesini güncelle (gelir işlemi için)
+          if (transaction.type == TransactionType.income &&
+              transaction.accountId != null) {
+            final account = await DatabaseHelper.instance
+                .getAccountById(transaction.accountId!);
+            if (account != null) {
+              // Gelir işlemi ekleme veya güncelleme
+              double amountDifference = transaction.amount;
+              if (widget.transaction!.accountId == transaction.accountId) {
+                // Aynı hesapta güncelleme yapılıyorsa, farkı hesapla
+                amountDifference =
+                    transaction.amount - widget.transaction!.amount;
+              } else if (widget.transaction!.accountId != null) {
+                // Farklı hesaba geçilmişse, eski hesaptaki tutarı çıkar
+                final oldAccount = await DatabaseHelper.instance
+                    .getAccountById(widget.transaction!.accountId!);
+                if (oldAccount != null) {
+                  await DatabaseHelper.instance.updateAccountBalance(
+                      oldAccount.id,
+                      oldAccount.balance - widget.transaction!.amount);
+                }
+              }
+
+              if (transaction.accountId == widget.transaction!.accountId ||
+                  widget.transaction!.accountId == null) {
+                // Aynı hesap veya yeni hesap atandıysa güncelle
+                await DatabaseHelper.instance.updateAccountBalance(
+                    account.id, account.balance + amountDifference);
+              }
+            }
+          }
         } else {
           // Yeni işlem modu
           if (transaction.recurringType != RecurringType.none) {
@@ -134,6 +202,17 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                 .createRecurringTransaction(transaction);
           } else {
             await DatabaseHelper.instance.insertTransaction(transaction);
+
+            // Gelir işlemi ise ve hesap seçilmişse, hesabın bakiyesini güncelle
+            if (transaction.type == TransactionType.income &&
+                transaction.accountId != null) {
+              final account = await DatabaseHelper.instance
+                  .getAccountById(transaction.accountId!);
+              if (account != null) {
+                await DatabaseHelper.instance.updateAccountBalance(
+                    account.id, account.balance + transaction.amount);
+              }
+            }
           }
         }
 
@@ -263,6 +342,41 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                     },
                   ),
                   const SizedBox(height: 16),
+
+                  // Gelir seçiliyse hesap seçimini göster
+                  if (_selectedType == TransactionType.income) ...[
+                    _isLoadingAccounts
+                        ? const Center(child: CircularProgressIndicator())
+                        : DropdownButtonFormField<String>(
+                            value: _selectedAccountId,
+                            decoration: const InputDecoration(
+                              labelText: 'Hesap/Kasa Seçiniz',
+                              border: OutlineInputBorder(),
+                              hintText: 'Gelir eklenecek hesabı seçin',
+                            ),
+                            items: _accounts.map((account) {
+                              return DropdownMenuItem(
+                                value: account.id,
+                                child: Text(
+                                    '${account.name} (${account.bankName})'),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedAccountId = value;
+                              });
+                            },
+                            validator: (value) {
+                              if (_selectedType == TransactionType.income &&
+                                  (value == null || value.isEmpty)) {
+                                return 'Lütfen gelirin ekleneceği hesabı seçin';
+                              }
+                              return null;
+                            },
+                          ),
+                    const SizedBox(height: 16),
+                  ],
+
                   DropdownButtonFormField<TransactionCategory>(
                     value: _selectedCategory,
                     decoration: const InputDecoration(

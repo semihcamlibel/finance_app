@@ -6,7 +6,6 @@ import '../services/notification_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme/app_theme.dart';
 
 class BudgetPage extends StatefulWidget {
   const BudgetPage({super.key});
@@ -25,14 +24,11 @@ class _BudgetPageState extends State<BudgetPage> {
   bool _isLoading = true;
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
-  bool _hideAmounts = false;
-  List<Color> _categoryColors = [];
 
   @override
   void initState() {
     super.initState();
     _initializeData();
-    _initCategoryColors();
   }
 
   Future<void> _initializeData() async {
@@ -45,7 +41,6 @@ class _BudgetPageState extends State<BudgetPage> {
     setState(() {
       _selectedCurrency = prefs.getString('currency') ?? '₺';
       currencyFormat = DatabaseHelper.getCurrencyFormat(_selectedCurrency);
-      _hideAmounts = prefs.getBool('hideAmounts') ?? false;
     });
   }
 
@@ -774,20 +769,5 @@ class _BudgetPageState extends State<BudgetPage> {
       );
       _loadBudgets();
     }
-  }
-
-  void _initCategoryColors() {
-    _categoryColors = [
-      AppTheme.primaryColor,
-      AppTheme.accentColor,
-      AppTheme.incomeColor,
-      AppTheme.expenseColor,
-      AppTheme.warningColor,
-      AppTheme.errorColor,
-      AppTheme.debtColor,
-      AppTheme.creditColor,
-      Colors.purple,
-      Colors.teal,
-    ];
   }
 }

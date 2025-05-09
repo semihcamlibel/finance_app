@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/transaction.dart';
+import '../models/account.dart';
 import '../services/database_helper.dart';
 import 'add_transaction_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -629,6 +630,13 @@ class _TransactionsPageState extends State<TransactionsPage> {
         transaction.parentTransactionId != null;
 
     bool applyToAll = false;
+    String? selectedAccountId;
+    List<Account> accounts = [];
+
+    // Aktif hesapları yükle
+    if (!transaction.isReceived) {
+      accounts = await DatabaseHelper.instance.getActiveAccounts();
+    }
 
     final bool? result = await showDialog<bool>(
       context: context,
@@ -643,6 +651,48 @@ class _TransactionsPageState extends State<TransactionsPage> {
                 Text(transaction.isReceived
                     ? '${transaction.title} alacağını tahsil edilmedi olarak işaretlemek istiyor musunuz?'
                     : '${transaction.title} alacağı tahsil edildi mi?'),
+
+                // Eğer tahsil edilecekse hesap seçimi göster
+                if (!transaction.isReceived) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Alacak tutarının ekleneceği hesabı seçin:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(),
+                      hintText: 'Hesap seçin',
+                    ),
+                    value: selectedAccountId,
+                    items: accounts.map((account) {
+                      return DropdownMenuItem<String>(
+                        value: account.id,
+                        child: Text(
+                            '${account.name} (${account.bankName}) - ${account.currency}'),
+                      );
+                    }).toList(),
+                    onChanged: (String? value) {
+                      setState(() {
+                        selectedAccountId = value;
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Lütfen bir hesap seçin';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+
                 if (isRecurring) ...[
                   const SizedBox(height: 16),
                   Row(
@@ -684,7 +734,19 @@ class _TransactionsPageState extends State<TransactionsPage> {
                 child: const Text('İptal'),
               ),
               TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: () {
+                  if (!transaction.isReceived && selectedAccountId == null) {
+                    // Hesap seçilmezse uyarı göster
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Lütfen bir hesap seçin'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  } else {
+                    Navigator.of(context).pop(true);
+                  }
+                },
                 child: Text(transaction.isReceived
                     ? 'Tahsil Edilmedi'
                     : 'Tahsil Edildi'),
@@ -699,7 +761,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
       if (transaction.isReceived) {
         await DatabaseHelper.instance.markCreditAsNotReceived(transaction.id);
       } else {
-        await DatabaseHelper.instance.markCreditAsReceived(transaction.id);
+        await DatabaseHelper.instance
+            .markCreditAsReceived(transaction.id, accountId: selectedAccountId);
       }
 
       // Eğer "tümüne uygula" seçeneği işaretlendiyse tekrarlanan işlemleri güncelle
@@ -718,6 +781,13 @@ class _TransactionsPageState extends State<TransactionsPage> {
         transaction.parentTransactionId != null;
 
     bool applyToAll = false;
+    String? selectedAccountId;
+    List<Account> accounts = [];
+
+    // Aktif hesapları yükle
+    if (!transaction.isPaid) {
+      accounts = await DatabaseHelper.instance.getActiveAccounts();
+    }
 
     final bool? result = await showDialog<bool>(
       context: context,
@@ -748,6 +818,50 @@ class _TransactionsPageState extends State<TransactionsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(content),
+
+                // Eğer tahsil edilecekse hesap seçimi göster
+                if (!transaction.isPaid) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    transaction.type == TransactionType.income
+                        ? 'Gelir tutarının ekleneceği hesabı seçin:'
+                        : 'Ödeme tutarının çekileceği hesabı seçin:',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(),
+                      hintText: 'Hesap seçin',
+                    ),
+                    value: selectedAccountId,
+                    items: accounts.map((account) {
+                      return DropdownMenuItem<String>(
+                        value: account.id,
+                        child: Text(
+                            '${account.name} (${account.bankName}) - ${account.currency}'),
+                      );
+                    }).toList(),
+                    onChanged: (String? value) {
+                      setState(() {
+                        selectedAccountId = value;
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Lütfen bir hesap seçin';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+
                 if (isRecurring) ...[
                   const SizedBox(height: 16),
                   Row(
@@ -789,7 +903,19 @@ class _TransactionsPageState extends State<TransactionsPage> {
                 child: const Text('İptal'),
               ),
               TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: () {
+                  if (!transaction.isPaid && selectedAccountId == null) {
+                    // Hesap seçilmezse uyarı göster
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Lütfen bir hesap seçin'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  } else {
+                    Navigator.of(context).pop(true);
+                  }
+                },
                 child: Text(actionText),
               ),
             ],
@@ -802,7 +928,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
       if (transaction.isPaid) {
         await DatabaseHelper.instance.markPaymentAsUnpaid(transaction.id);
       } else {
-        await DatabaseHelper.instance.markPaymentAsPaid(transaction.id);
+        await DatabaseHelper.instance
+            .markPaymentAsPaid(transaction.id, accountId: selectedAccountId);
       }
 
       // Eğer "tümüne uygula" seçeneği işaretlendiyse tekrarlanan işlemleri güncelle

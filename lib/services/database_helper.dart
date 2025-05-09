@@ -280,7 +280,7 @@ class DatabaseHelper {
   }
 
   // Alacağı tahsil edildi olarak işaretle
-  Future<void> markCreditAsReceived(String id) async {
+  Future<void> markCreditAsReceived(String id, {String? accountId}) async {
     final db = await database;
 
     // Önce mevcut işlemi al
@@ -312,9 +312,34 @@ class DatabaseHelper {
         type: TransactionType.income,
         category: transaction.category,
         description: 'Alacak tahsilatı: ${transaction.description ?? ""}',
+        accountId: accountId, // Seçilen hesaba ekle
       );
 
       await db.insert('transactions', newIncome.toMap());
+
+      // Eğer hesap seçilmişse, hesabın bakiyesini güncelle
+      if (accountId != null) {
+        final accountMaps = await db.query(
+          'accounts',
+          where: 'id = ?',
+          whereArgs: [accountId],
+        );
+
+        if (accountMaps.isNotEmpty) {
+          final account = Account.fromMap(accountMaps.first);
+          final newBalance = account.balance + transaction.amount;
+
+          await db.update(
+            'accounts',
+            {
+              'balance': newBalance,
+              'updatedAt': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [accountId],
+          );
+        }
+      }
     }
   }
 
@@ -372,7 +397,7 @@ class DatabaseHelper {
   }
 
   // Gider işlemlerini ödendi/ödenmedi işaretleme metodları
-  Future<void> markPaymentAsPaid(String id) async {
+  Future<void> markPaymentAsPaid(String id, {String? accountId}) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
 
@@ -397,7 +422,30 @@ class DatabaseHelper {
         whereArgs: [id],
       );
 
-      // Gider işlemi oluşturma kısmını kaldırdık (varlık direkt değişmeyecek)
+      // Eğer hesap seçilmişse, hesabın bakiyesini güncelle (gider olarak azalt)
+      if (accountId != null) {
+        final accountMaps = await db.query(
+          'accounts',
+          where: 'id = ?',
+          whereArgs: [accountId],
+        );
+
+        if (accountMaps.isNotEmpty) {
+          final account = Account.fromMap(accountMaps.first);
+          // Gider olduğu için tutarı çıkarıyoruz
+          final newBalance = account.balance - transaction.amount.abs();
+
+          await db.update(
+            'accounts',
+            {
+              'balance': newBalance,
+              'updatedAt': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [accountId],
+          );
+        }
+      }
     }
   }
 

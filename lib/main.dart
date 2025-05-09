@@ -3,6 +3,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_page.dart';
+import 'screens/dashboard_page.dart';
+import 'screens/transactions_page.dart';
+import 'screens/finance_page.dart';
+import 'screens/notification_test_page.dart';
+import 'screens/accounts_list_page.dart';
 import 'services/database_helper.dart';
 import 'services/notification_service.dart';
 import 'services/auth_service.dart';
@@ -60,6 +65,8 @@ class _FinanceAppState extends State<FinanceApp> {
   Color _primaryColor = AppTheme.primaryColor;
   final ValueNotifier<ThemeMode> _themeMode = ValueNotifier(ThemeMode.light);
   bool _isAuthenticated = false;
+  int _selectedIndex = 0;
+  bool _refreshDashboard = false;
 
   @override
   void initState() {
@@ -245,5 +252,67 @@ class _FinanceAppState extends State<FinanceApp> {
         ),
       ),
     );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      currentIndex: _selectedIndex,
+      type: BottomNavigationBarType.fixed,
+      onTap: _onItemTapped,
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.dashboard),
+          label: 'Özet',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.swap_horiz),
+          label: 'İşlemler',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.analytics),
+          label: 'Finansal',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.account_balance_wallet),
+          label: 'Hesaplar',
+        ),
+      ],
+    );
+  }
+
+  String _getScreenTitle() {
+    switch (_selectedIndex) {
+      case 0:
+        return 'Finans Takip';
+      case 1:
+        return 'İşlemler';
+      case 2:
+        return 'Finans Analizi';
+      case 3:
+        return 'Hesaplar / Kasalar';
+      default:
+        return 'Finans Takip';
+    }
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  Widget _buildFloatingActionButton() {
+    // FloatingActionButton için uygun kod burada eklenebilir
+    return FloatingActionButton(
+      onPressed: () {
+        // FloatingActionButton için işlem eklenecek
+      },
+      child: const Icon(Icons.add),
+    );
+  }
+
+  Widget _buildDrawer() {
+    // Drawer için uygun kod burada eklenebilir
+    return Drawer();
   }
 }

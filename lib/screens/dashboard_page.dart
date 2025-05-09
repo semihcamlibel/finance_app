@@ -7,7 +7,7 @@ import '../models/account.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import 'notifications_list_page.dart';
-import '../services/currency_service.dart';
+import 'accounts_list_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -21,23 +21,12 @@ class DashboardPageState extends State<DashboardPage> {
   String _selectedCurrency = '₺';
   bool _hideAmounts = false;
   int _notificationCount = 0;
-  bool _isLoadingCurrencies = true;
 
   @override
   void initState() {
     super.initState();
-    _initialize();
-  }
-
-  Future<void> _initialize() async {
-    // Kurları başlangıçta yükle
-    setState(() => _isLoadingCurrencies = true);
-    await CurrencyService.instance.initializeRates();
-
-    await _loadSettings();
-    await _loadNotificationCount();
-
-    setState(() => _isLoadingCurrencies = false);
+    _loadSettings();
+    _loadNotificationCount();
   }
 
   Future<void> _loadSettings() async {
@@ -217,8 +206,7 @@ class DashboardPageState extends State<DashboardPage> {
     return FutureBuilder<Map<String, double>>(
       future: _getFinancialSummary(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting ||
-            _isLoadingCurrencies) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
             padding: EdgeInsets.all(24.0),
             child: Center(
@@ -232,8 +220,7 @@ class DashboardPageState extends State<DashboardPage> {
         }
 
         final data = snapshot.data!;
-        // Net değeri ve hesap bakiyelerini de içeren toplam varlık
-        final netWorth = data['netWorth']!;
+        final netWorth = data['totalAssets']!;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -241,7 +228,7 @@ class DashboardPageState extends State<DashboardPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
-              _buildMainBalanceCard(netWorth, data['accountsTotal'] ?? 0),
+              _buildMainBalanceCard(netWorth),
               const SizedBox(height: 24),
               Text(
                 'Genel Bakış',
@@ -378,130 +365,127 @@ class DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildMainBalanceCard(double balance, double accountsTotal) {
+  Widget _buildMainBalanceCard(double balance) {
     final isPositive = balance >= 0;
     final color = isPositive ? AppTheme.incomeColor : AppTheme.expenseColor;
 
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              color.withOpacity(0.8),
-              color,
-            ],
+    return GestureDetector(
+      onTap: () {
+        // Hesaplar sayfasına yönlendir
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const AccountsListPage(),
           ),
+        ).then((_) {
+          // Hesaplar sayfasından dönünce veri yenilensin
+          setState(() {}); // Sayfayı yenile
+        });
+      },
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Toplam Varlık',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 16,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isPositive ? Icons.trending_up : Icons.trending_down,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '6.4%',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                color.withOpacity(0.8),
+                color,
               ],
             ),
-            const SizedBox(height: 20),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _hideAmounts ? '*****' : currencyFormat.format(balance),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 28,
-                ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Toplam Varlık',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isPositive ? Icons.trending_up : Icons.trending_down,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          '6.4%',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 5),
-            // Hesaplarda bulunan toplam miktar
-            if (accountsTotal > 0)
+              const SizedBox(height: 20),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  _hideAmounts
-                      ? '****'
-                      : 'Hesaplarda: ${currencyFormat.format(accountsTotal)}',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontWeight: FontWeight.normal,
-                    fontSize: 14,
+                  _hideAmounts ? '*****' : currencyFormat.format(balance),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 28,
                   ),
                 ),
               ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Bu ayki toplam varlık değişimi',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Tüm hesapların toplam değeri (Hesapları görüntülemek için tıklayın)',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.arrow_forward,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1004,9 +988,16 @@ class DashboardPageState extends State<DashboardPage> {
     double expense = 0;
     double credit = await DatabaseHelper.instance.getTotalCredit();
     double debt = await DatabaseHelper.instance.getTotalDebt();
-    double accountsTotal = 0;
+    double totalAssets = 0;
 
-    // Varlık hesaplama mantığı
+    // Hesaplardaki toplam varlık
+    for (var account in accounts) {
+      if (account.isActive) {
+        totalAssets += account.balance;
+      }
+    }
+
+    // Gelir/gider hesaplaması (istatistik amaçlı)
     for (var transaction in transactions) {
       if (transaction.type == TransactionType.income) {
         income += transaction.amount;
@@ -1019,29 +1010,12 @@ class DashboardPageState extends State<DashboardPage> {
       }
     }
 
-    // Hesapları kullanıcının seçtiği para birimine çevir ve topla
-    if (accounts.isNotEmpty) {
-      for (var account in accounts) {
-        if (account.isActive) {
-          // Hesap bakiyesini kullanıcının seçtiği para birimine çevir
-          double convertedBalance = CurrencyService.instance
-              .convertAccountBalance(
-                  account.balance, account.currency, _selectedCurrency);
-          accountsTotal += convertedBalance;
-        }
-      }
-    }
-
-    // Net toplam varlık: İşlemlerden gelen net değer + hesaplardaki toplam bakiye
-    double netWorth = (income - expense + credit - debt + accountsTotal);
-
     return {
       'income': income,
       'expense': expense,
       'credit': credit,
       'debt': debt,
-      'accountsTotal': accountsTotal,
-      'netWorth': netWorth,
+      'totalAssets': totalAssets,
     };
   }
 }
