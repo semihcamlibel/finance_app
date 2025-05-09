@@ -64,6 +64,12 @@ class FinanceTransaction {
     this.parentTransactionId,
   }) : id = id ?? const Uuid().v4();
 
+  // isCredit getter'ı
+  bool get isCredit => type == TransactionType.credit;
+
+  // isDebt getter'ı
+  bool get isDebt => type == TransactionType.debt;
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

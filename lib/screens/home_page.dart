@@ -4,6 +4,7 @@ import 'transactions_page.dart';
 import 'budget_page.dart';
 import 'notification_test_page.dart';
 import 'settings_page.dart';
+import '../theme/app_theme.dart';
 
 class HomePage extends StatefulWidget {
   final Function(bool) onThemeChanged;
@@ -42,40 +43,58 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Finans Takip'),
-        elevation: 0,
-      ),
       body: _pages[_selectedIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (int index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard),
-            label: 'Özet',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long),
-            label: 'İşlemler',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet),
-            label: 'Bütçe',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.notifications),
-            label: 'Bildirimler',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings),
-            label: 'Ayarlar',
-          ),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: (int index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+          backgroundColor: Colors.white,
+          elevation: 0,
+          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard, color: AppTheme.primaryColor),
+              label: 'Özet',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.receipt_long_outlined),
+              selectedIcon:
+                  Icon(Icons.receipt_long, color: AppTheme.primaryColor),
+              label: 'İşlemler',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              selectedIcon: Icon(Icons.account_balance_wallet,
+                  color: AppTheme.primaryColor),
+              label: 'Bütçe',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.notifications_outlined),
+              selectedIcon:
+                  Icon(Icons.notifications, color: AppTheme.primaryColor),
+              label: 'Bildirimler',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings, color: AppTheme.primaryColor),
+              label: 'Ayarlar',
+            ),
+          ],
+        ),
       ),
     );
   }

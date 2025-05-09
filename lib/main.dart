@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_page.dart';
 import 'services/notification_service.dart';
 import 'services/auth_service.dart';
+import 'theme/app_theme.dart';
 
 // Sayfa geçiş animasyonu için özel route sınıfı
 class CustomPageRoute<T> extends PageRouteBuilder<T> {
@@ -42,7 +43,7 @@ class FinanceApp extends StatefulWidget {
 
 class _FinanceAppState extends State<FinanceApp> {
   bool _isDarkMode = false;
-  Color _primaryColor = Colors.deepPurple;
+  Color _primaryColor = AppTheme.primaryColor;
   final ValueNotifier<ThemeMode> _themeMode = ValueNotifier(ThemeMode.light);
   bool _isAuthenticated = false;
 
@@ -65,42 +66,37 @@ class _FinanceAppState extends State<FinanceApp> {
     setState(() {
       _isDarkMode = prefs.getBool('isDarkMode') ?? false;
       _primaryColor =
-          Color(prefs.getInt('primaryColor') ?? Colors.deepPurple.value);
+          Color(prefs.getInt('primaryColor') ?? AppTheme.primaryColor.value);
       _themeMode.value = _isDarkMode ? ThemeMode.dark : ThemeMode.light;
     });
   }
 
   ThemeData _buildTheme(bool isDark) {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: _primaryColor,
-      brightness: isDark ? Brightness.dark : Brightness.light,
-    );
-
-    return ThemeData(
-      colorScheme: colorScheme,
-      useMaterial3: true,
-      brightness: isDark ? Brightness.dark : Brightness.light,
-      appBarTheme: AppBarTheme(
-        backgroundColor: isDark ? colorScheme.surface : colorScheme.primary,
-        foregroundColor: isDark ? colorScheme.onSurface : colorScheme.onPrimary,
-        elevation: 0,
-      ),
-      cardTheme: CardTheme(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+    if (isDark) {
+      // Karanlık tema için özel ayarlamalar yapılabilir
+      final darkTheme = ThemeData.dark().copyWith(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _primaryColor,
+          brightness: Brightness.dark,
         ),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        labelTextStyle: MaterialStateProperty.all(
-          const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.grey.shade900,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
         ),
-      ),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-      ),
-    );
+      );
+      return darkTheme;
+    } else {
+      // Aydınlık tema için yeni AppTheme'i kullanalım
+      return AppTheme.lightTheme.copyWith(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _primaryColor,
+          brightness: Brightness.light,
+        ),
+      );
+    }
   }
 
   @override

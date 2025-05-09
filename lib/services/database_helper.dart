@@ -695,4 +695,35 @@ class DatabaseHelper {
             locale: 'tr_TR', symbol: '₺', decimalDigits: 2);
     }
   }
+
+  // Son X gün içindeki işlemleri getiren fonksiyon
+  Future<List<FinanceTransaction>> getTransactionsForLastDays(int days) async {
+    final db = await database;
+    final date = DateTime.now().subtract(Duration(days: days));
+    final dateStr = date.toIso8601String();
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'transactions',
+      where: 'date >= ?',
+      whereArgs: [dateStr],
+      orderBy: 'date DESC',
+    );
+
+    return List.generate(
+        maps.length, (i) => FinanceTransaction.fromMap(maps[i]));
+  }
+
+  // Son X adet işlemi getiren fonksiyon
+  Future<List<FinanceTransaction>> getRecentTransactions(int limit) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'transactions',
+      orderBy: 'date DESC',
+      limit: limit,
+    );
+
+    return List.generate(
+        maps.length, (i) => FinanceTransaction.fromMap(maps[i]));
+  }
 }

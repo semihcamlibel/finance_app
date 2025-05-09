@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../services/database_helper.dart';
 import '../models/transaction.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/app_theme.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -34,69 +35,65 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          _buildFinancialSummary(),
-          _buildOverdueAndUpcomingPayments(),
-          _buildCharts(),
-          _buildRecentTransactions(),
-        ],
+    return SafeArea(
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildPageHeader(),
+            _buildFinancialSummary(),
+            _buildOverdueAndUpcomingPayments(),
+            _buildCharts(),
+            _buildRecentTransactions(),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withOpacity(0.8),
-          ],
-        ),
-      ),
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Finansal Özet',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
+  Widget _buildPageHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Finansal Durum',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkGreyColor,
+                        ),
                   ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
+                  const SizedBox(height: 5),
+                  Text(
                     DateFormat('MMMM yyyy', 'tr_TR').format(DateTime.now()),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppTheme.greyColor,
+                        ),
                   ),
+                ],
+              ),
+              Container(
+                height: 40,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ],
-            ),
-          ],
-        ),
+                child: Icon(
+                  Icons.notifications_none_outlined,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -106,7 +103,12 @@ class _DashboardPageState extends State<DashboardPage> {
       future: _getFinancialSummary(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
 
         if (snapshot.hasError) {
@@ -119,543 +121,83 @@ class _DashboardPageState extends State<DashboardPage> {
             data['credit']! -
             data['debt']!);
 
-        return Container(
-          margin: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _buildSummaryCard(
-                'Net Durum',
-                netWorth,
-                netWorth >= 0 ? Colors.green : Colors.red,
-                Icons.account_balance,
-                isLarge: true,
-              ),
-              const SizedBox(height: 16),
-              if (data['income']! > 0 || data['expense']! > 0)
-                Row(
-                  children: [
-                    if (data['income']! > 0)
-                      Expanded(
-                        child: _buildSummaryCard(
-                          'Gelir',
-                          data['income']!,
-                          Colors.green,
-                          Icons.arrow_upward,
-                        ),
-                      ),
-                    if (data['income']! > 0 && data['expense']! > 0)
-                      const SizedBox(width: 16),
-                    if (data['expense']! > 0)
-                      Expanded(
-                        child: _buildSummaryCard(
-                          'Gider',
-                          data['expense']!,
-                          Colors.red,
-                          Icons.arrow_downward,
-                        ),
-                      ),
-                  ],
-                ),
-              if ((data['income']! > 0 || data['expense']! > 0) &&
-                  (data['credit']! > 0 || data['debt']! > 0))
-                const SizedBox(height: 16),
-              if (data['credit']! > 0 || data['debt']! > 0)
-                Row(
-                  children: [
-                    if (data['credit']! > 0)
-                      Expanded(
-                        child: _buildSummaryCard(
-                          'Alacak',
-                          data['credit']!,
-                          Colors.blue,
-                          Icons.attach_money,
-                        ),
-                      ),
-                    if (data['credit']! > 0 && data['debt']! > 0)
-                      const SizedBox(width: 16),
-                    if (data['debt']! > 0)
-                      Expanded(
-                        child: _buildSummaryCard(
-                          'Borç',
-                          data['debt']!,
-                          Colors.orange,
-                          Icons.money_off,
-                        ),
-                      ),
-                  ],
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildOverdueAndUpcomingPayments() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        FutureBuilder<List<FinanceTransaction>>(
-          future: DatabaseHelper.instance.getUnpaidExpenses(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const SizedBox();
-
-            final overdueTransactions = snapshot.data!
-                .where((t) => !t.isPaid && t.date.isBefore(DateTime.now()))
-                .toList();
-
-            if (overdueTransactions.isEmpty) return const SizedBox();
-
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.warning, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text(
-                        'Gecikmiş Ödemeler',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Column(
-                    children: overdueTransactions.map((transaction) {
-                      final daysOverdue =
-                          DateTime.now().difference(transaction.date).inDays;
-                      return Card(
-                        elevation: 2,
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: const Icon(Icons.warning, color: Colors.red),
-                          title: Text(
-                            transaction.title,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          subtitle: Text(
-                            '${DateFormat('dd.MM.yyyy').format(transaction.date)} ($daysOverdue gün gecikmiş)',
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                          trailing: Text(
-                            currencyFormat.format(transaction.amount),
-                            style: const TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-        FutureBuilder<List<FinanceTransaction>>(
-          future: DatabaseHelper.instance.getUnpaidExpenses(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const SizedBox();
-
-            final now = DateTime.now();
-            final threeDaysLater = now.add(const Duration(days: 3));
-
-            final upcomingTransactions = snapshot.data!
-                .where((t) =>
-                    !t.isPaid &&
-                    t.date.isAfter(now) &&
-                    t.date.isBefore(threeDaysLater))
-                .toList();
-
-            if (upcomingTransactions.isEmpty) return const SizedBox();
-
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.upcoming, color: Colors.orange),
-                      SizedBox(width: 8),
-                      Text(
-                        'Yaklaşan Ödemeler',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Column(
-                    children: upcomingTransactions.map((transaction) {
-                      final daysLeft =
-                          transaction.date.difference(DateTime.now()).inDays;
-                      return Card(
-                        elevation: 2,
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading:
-                              const Icon(Icons.upcoming, color: Colors.orange),
-                          title: Text(
-                            transaction.title,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          subtitle: Text(
-                            '${DateFormat('dd.MM.yyyy').format(transaction.date)} ($daysLeft gün kaldı)',
-                            style: const TextStyle(color: Colors.orange),
-                          ),
-                          trailing: Text(
-                            currencyFormat.format(transaction.amount),
-                            style: const TextStyle(
-                              color: Colors.orange,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCharts() {
-    return FutureBuilder<Map<String, double>>(
-      future: _getFinancialSummary(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox();
-
-        final data = snapshot.data!;
-        final hasIncomeOrExpense = data['income']! > 0 || data['expense']! > 0;
-        final hasCreditOrDebt = data['credit']! > 0 || data['debt']! > 0;
-
-        return Column(
-          children: [
-            if (hasIncomeOrExpense) ...[
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Gelir/Gider Dağılımı',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 200,
-                          child: PieChart(
-                            PieChartData(
-                              sections: [
-                                if (data['income']! > 0)
-                                  PieChartSectionData(
-                                    value: data['income']!,
-                                    title: 'Gelir',
-                                    color: Colors.green,
-                                    radius: 80,
-                                    titleStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                if (data['expense']! > 0)
-                                  PieChartSectionData(
-                                    value: data['expense']!,
-                                    title: 'Gider',
-                                    color: Colors.red,
-                                    radius: 80,
-                                    titleStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                              ],
-                              sectionsSpace: 2,
-                              centerSpaceRadius: 40,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            if (hasCreditOrDebt) ...[
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Alacak/Borç Dağılımı',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 200,
-                          child: PieChart(
-                            PieChartData(
-                              sections: [
-                                if (data['credit']! > 0)
-                                  PieChartSectionData(
-                                    value: data['credit']!,
-                                    title: 'Alacak',
-                                    color: Colors.blue,
-                                    radius: 80,
-                                    titleStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                if (data['debt']! > 0)
-                                  PieChartSectionData(
-                                    value: data['debt']!,
-                                    title: 'Borç',
-                                    color: Colors.orange,
-                                    radius: 80,
-                                    titleStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                              ],
-                              sectionsSpace: 2,
-                              centerSpaceRadius: 40,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildRecentTransactions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Son İşlemler',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+              const SizedBox(height: 16),
+              _buildMainBalanceCard(netWorth),
+              const SizedBox(height: 24),
+              Text(
+                'Genel Bakış',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const SizedBox(height: 16),
-              FutureBuilder<List<FinanceTransaction>>(
-                future: DatabaseHelper.instance.getAllTransactions(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Hata: ${snapshot.error}'));
-                  }
-
-                  final transactions = snapshot.data!;
-                  transactions.sort((a, b) => b.date.compareTo(a.date));
-                  final recentTransactions = transactions.take(5).toList();
-
-                  if (recentTransactions.isEmpty) {
-                    return Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.receipt_long,
-                                size: 48,
-                                color: Colors.grey,
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'Henüz işlem bulunmuyor',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  return Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: recentTransactions.map((transaction) {
-                        return Column(
-                          children: [
-                            ListTile(
-                              leading: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: _getAmountColor(transaction.type)
-                                      .withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: _getTransactionIcon(transaction.type),
-                              ),
-                              title: Text(
-                                transaction.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    DateFormat('dd.MM.yyyy')
-                                        .format(transaction.date),
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  if (transaction.description != null) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      transaction.description!,
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 12,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              trailing: _hideAmounts
-                                  ? const Text(
-                                      '*****',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    )
-                                  : Text(
-                                      currencyFormat.format(transaction.amount),
-                                      style: TextStyle(
-                                        color:
-                                            _getAmountColor(transaction.type),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                            ),
-                            if (recentTransactions.last != transaction)
-                              const Divider(height: 1),
-                          ],
-                        );
-                      }).toList(),
-                    ),
-                  );
-                },
-              ),
+              _buildSummaryGrid(data),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSummaryGrid(Map<String, double> data) {
+    return GridView.count(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      crossAxisCount: 2,
+      childAspectRatio: 1.5,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      children: [
+        _buildSummaryCard(
+          'Gelir',
+          data['income']!,
+          Icons.arrow_upward_rounded,
+          AppTheme.incomeColor,
+        ),
+        _buildSummaryCard(
+          'Gider',
+          data['expense']!,
+          Icons.arrow_downward_rounded,
+          AppTheme.expenseColor,
+        ),
+        _buildSummaryCard(
+          'Alacak',
+          data['credit']!,
+          Icons.account_balance_wallet_rounded,
+          AppTheme.accentColor,
+        ),
+        _buildSummaryCard(
+          'Borç',
+          data['debt']!,
+          Icons.money_off_rounded,
+          AppTheme.warningColor,
         ),
       ],
     );
   }
 
   Widget _buildSummaryCard(
-      String title, double amount, Color color, IconData icon,
-      {bool isLarge = false}) {
-    if (amount == 0) return const SizedBox();
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor =
-        isDark ? Theme.of(context).colorScheme.surface : Colors.white;
-    final textColor =
-        isDark ? Theme.of(context).colorScheme.onSurface : Colors.black87;
-
+      String title, double amount, IconData icon, Color color) {
     return Card(
-      elevation: 4,
+      elevation: 2,
+      shadowColor: color.withOpacity(0.3),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: Container(
-        padding: EdgeInsets.all(isLarge ? 24.0 : 16.0),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              cardColor,
-              isDark
-                  ? Theme.of(context).colorScheme.surface.withOpacity(0.5)
-                  : color.withOpacity(0.1),
-            ],
-          ),
+        side: BorderSide(
+          color: color.withOpacity(0.1),
+          width: 1,
         ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               children: [
@@ -665,82 +207,677 @@ class _DashboardPageState extends State<DashboardPage> {
                     color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: color),
+                  child: Icon(
+                    icon,
+                    color: color,
+                    size: 20,
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: isLarge ? 20 : 16,
-                    fontWeight: FontWeight.w500,
-                    color: textColor,
+                const Spacer(),
+                Container(
+                  height: 24,
+                  width: 48,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      amount > 0
+                          ? '+${amount.toStringAsFixed(0)}%'
+                          : '${amount.toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            _hideAmounts
-                ? Text(
-                    '*****',
-                    style: TextStyle(
-                      fontSize: isLarge ? 32 : 24,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  )
-                : Text(
-                    currencyFormat.format(amount),
-                    style: TextStyle(
-                      fontSize: isLarge ? 32 : 24,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                color: AppTheme.greyColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _hideAmounts ? '*****' : currencyFormat.format(amount),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: color,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildMainBalanceCard(double balance) {
+    final isPositive = balance >= 0;
+    final color = isPositive ? AppTheme.incomeColor : AppTheme.expenseColor;
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withOpacity(0.8),
+              color,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Toplam Varlık',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 16,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isPositive ? Icons.trending_up : Icons.trending_down,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        '6.4%',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              _hideAmounts ? '*****' : currencyFormat.format(balance),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 28,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Bu ayki toplam varlık değişimi',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverdueAndUpcomingPayments() {
+    return FutureBuilder<List<FinanceTransaction>>(
+      future: DatabaseHelper.instance.getUnpaidExpenses(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty)
+          return const SizedBox();
+
+        final overdueTransactions = snapshot.data!
+            .where((t) => !t.isPaid && t.date.isBefore(DateTime.now()))
+            .toList();
+
+        if (overdueTransactions.isEmpty) return const SizedBox();
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.errorColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppTheme.errorColor,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Gecikmiş Ödemeler',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.errorColor,
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ListView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
+                itemCount: overdueTransactions.length > 3
+                    ? 3
+                    : overdueTransactions.length,
+                itemBuilder: (context, index) {
+                  final transaction = overdueTransactions[index];
+                  final daysOverdue =
+                      DateTime.now().difference(transaction.date).inDays;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.errorColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.receipt_long,
+                            color: AppTheme.errorColor,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                transaction.title,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              Text(
+                                '$daysOverdue gün gecikmiş',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: AppTheme.errorColor,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          _hideAmounts
+                              ? '****'
+                              : currencyFormat.format(transaction.amount),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.errorColor,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              if (overdueTransactions.length > 3)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Center(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        // Navigate to transactions page
+                      },
+                      icon: const Icon(Icons.visibility),
+                      label: const Text('Tümünü Gör'),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCharts() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Son 7 Gün',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildChartLegendItem('Gelir', AppTheme.incomeColor),
+                    _buildChartLegendItem('Gider', AppTheme.expenseColor),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 200,
+                  child: FutureBuilder<List<FinanceTransaction>>(
+                    future:
+                        DatabaseHelper.instance.getTransactionsForLastDays(7),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      return _buildBarChart(snapshot.data!);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChartLegendItem(String title, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentTransactions() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Son İşlemler',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              TextButton(
+                onPressed: () {
+                  // Navigate to transactions page
+                },
+                child: const Text('Tümünü Gör'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          FutureBuilder<List<FinanceTransaction>>(
+            future: DatabaseHelper.instance.getRecentTransactions(5),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.receipt_long,
+                          size: 48,
+                          color: AppTheme.greyColor,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Henüz işlem kaydı bulunmuyor',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: AppTheme.greyColor,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, index) {
+                  final transaction = snapshot.data![index];
+                  return _buildTransactionItem(transaction);
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionItem(FinanceTransaction transaction) {
+    final isIncome = transaction.amount >= 0;
+    final color = isIncome ? AppTheme.incomeColor : AppTheme.expenseColor;
+    final icon = isIncome ? Icons.arrow_upward : Icons.arrow_downward;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  transaction.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                Text(
+                  DateFormat('dd MMMM yyyy', 'tr_TR').format(transaction.date),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          Text(
+            _hideAmounts ? '****' : currencyFormat.format(transaction.amount),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBarChart(List<FinanceTransaction> transactions) {
+    final now = DateTime.now();
+    final dayLabels = List.generate(7, (i) {
+      final day = now.subtract(Duration(days: 6 - i));
+      return DateFormat('E', 'tr_TR').format(day).substring(0, 2);
+    });
+
+    // Günlük gelir ve gider toplamlarını hesapla
+    final Map<int, double> incomeData = {};
+    final Map<int, double> expenseData = {};
+
+    for (int i = 0; i < 7; i++) {
+      final date = now.subtract(Duration(days: 6 - i));
+      final dayTransactions = transactions.where((t) =>
+          t.date.year == date.year &&
+          t.date.month == date.month &&
+          t.date.day == date.day);
+
+      double income = 0;
+      double expense = 0;
+
+      for (var transaction in dayTransactions) {
+        if (transaction.amount >= 0) {
+          income += transaction.amount;
+        } else {
+          expense += transaction.amount.abs();
+        }
+      }
+
+      incomeData[i] = income;
+      expenseData[i] = expense;
+    }
+
+    // Max değeri bulma
+    double maxValue = 0;
+    for (int i = 0; i < 7; i++) {
+      final total = (incomeData[i] ?? 0) + (expenseData[i] ?? 0);
+      if (total > maxValue) maxValue = total;
+    }
+
+    // Eğer tüm değerler 0 ise, minimum bir yükseklik için
+    maxValue = maxValue == 0 ? 1000 : maxValue;
+
+    return BarChart(
+      BarChartData(
+        maxY: maxValue * 1.2, // Biraz ekstra alan bırakma
+        barGroups: List.generate(7, (i) {
+          return BarChartGroupData(
+            x: i,
+            barRods: [
+              BarChartRodData(
+                toY: incomeData[i] ?? 0,
+                color: AppTheme.incomeColor,
+                width: 8,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(4),
+                ),
+              ),
+              BarChartRodData(
+                toY: expenseData[i] ?? 0,
+                color: AppTheme.expenseColor,
+                width: 8,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(4),
+                ),
+              ),
+            ],
+          );
+        }),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    dayLabels[value.toInt()],
+                    style: const TextStyle(
+                      color: AppTheme.greyColor,
+                      fontSize: 12,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: false,
+            ),
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        gridData: const FlGridData(show: false),
+        alignment: BarChartAlignment.spaceAround,
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+            tooltipBgColor: Colors.blueGrey.shade800,
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              final value = rod.toY;
+              return BarTooltipItem(
+                _hideAmounts ? '***' : currencyFormat.format(value),
+                const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<Map<String, double>> _getFinancialSummary() async {
-    final income = await DatabaseHelper.instance.getTotalIncome();
-    final expense = await DatabaseHelper.instance.getTotalExpense();
-    final debt = await DatabaseHelper.instance.getTotalDebt();
-    final credit = await DatabaseHelper.instance.getTotalCredit();
+    final transactions = await DatabaseHelper.instance.getAllTransactions();
+
+    double income = 0;
+    double expense = 0;
+    double credit = 0;
+    double debt = 0;
+
+    for (var transaction in transactions) {
+      if (transaction.amount >= 0) {
+        income += transaction.amount;
+      } else {
+        expense += transaction.amount.abs();
+      }
+
+      if (transaction.isCredit && !transaction.isPaid) {
+        credit += transaction.amount.abs();
+      }
+
+      if (transaction.isDebt && !transaction.isPaid) {
+        debt += transaction.amount.abs();
+      }
+    }
 
     return {
       'income': income,
       'expense': expense,
-      'debt': debt,
       'credit': credit,
+      'debt': debt,
     };
-  }
-
-  Icon _getTransactionIcon(TransactionType type) {
-    switch (type) {
-      case TransactionType.income:
-        return const Icon(Icons.arrow_upward, color: Colors.green);
-      case TransactionType.expense:
-        return const Icon(Icons.arrow_downward, color: Colors.red);
-      case TransactionType.debt:
-        return const Icon(Icons.money_off, color: Colors.orange);
-      case TransactionType.credit:
-        return const Icon(Icons.attach_money, color: Colors.blue);
-      case TransactionType.payment:
-        return const Icon(Icons.payment, color: Colors.purple);
-    }
-  }
-
-  Color _getAmountColor(TransactionType type) {
-    switch (type) {
-      case TransactionType.income:
-      case TransactionType.credit:
-        return Colors.green;
-      case TransactionType.expense:
-      case TransactionType.debt:
-        return Colors.red;
-      case TransactionType.payment:
-        return Colors.purple;
-    }
   }
 }

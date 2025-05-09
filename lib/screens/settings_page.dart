@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
 import 'package:intl/intl.dart';
 import 'home_page.dart';
+import '../theme/app_theme.dart';
 
 class SettingsPage extends StatefulWidget {
   final Function(bool) onThemeChanged;
@@ -120,9 +121,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ayarlar kaydedildi'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: const Text('Ayarlar kaydedildi'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -149,33 +154,41 @@ class _SettingsPageState extends State<SettingsPage> {
           title: const Text('Ana Renk Seçin'),
           content: SingleChildScrollView(
             child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Colors.deepPurple,
-                Colors.blue,
-                Colors.green,
-                Colors.orange,
-                Colors.red,
-                Colors.pink,
-                Colors.teal,
-                Colors.indigo,
-              ].map((color) {
+              spacing: 12,
+              runSpacing: 12,
+              children: AppTheme.colorOptions.map((color) {
                 return InkWell(
                   onTap: () => Navigator.of(context).pop(color),
                   child: Container(
-                    width: 40,
-                    height: 40,
+                    width: 50,
+                    height: 50,
                     decoration: BoxDecoration(
                       color: color,
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: _primaryColor == color
-                            ? Colors.white
+                            ? Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black
                             : Colors.transparent,
                         width: 2,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withOpacity(0.5),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
+                    child: _primaryColor == color
+                        ? Icon(
+                            Icons.check,
+                            color: color.computeLuminance() > 0.5
+                                ? Colors.black
+                                : Colors.white,
+                          )
+                        : null,
                   ),
                 );
               }).toList(),
@@ -200,9 +213,13 @@ class _SettingsPageState extends State<SettingsPage> {
       // Yeniden yükleme için ana sayfaya bildir
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Para birimi güncellendi'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: const Text('Para birimi güncellendi'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         );
         Navigator.pushReplacement(
@@ -220,15 +237,22 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ayarlar'),
+        centerTitle: true,
+        elevation: 0,
+      ),
       body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           _buildSection(
             'Bildirim Ayarları',
-            Icon(Icons.notifications_outlined,
-                color: Theme.of(context).primaryColor),
+            Icons.notifications_outlined,
             [
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 title: const Text('Ödeme Bildirimleri'),
                 subtitle: const Text('Yaklaşan ödemeler için bildirim al'),
                 value: _showPaymentNotifications,
@@ -236,8 +260,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   setState(() => _showPaymentNotifications = value);
                   await _saveSettings();
                 },
+                activeColor: _primaryColor,
               ),
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 title: const Text('Gelir Bildirimleri'),
                 subtitle: const Text('Beklenen gelirler için bildirim al'),
                 value: _showIncomeNotifications,
@@ -245,8 +270,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   setState(() => _showIncomeNotifications = value);
                   await _saveSettings();
                 },
+                activeColor: _primaryColor,
               ),
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 title: const Text('Bütçe Bildirimleri'),
                 subtitle: const Text('Bütçe aşımları için bildirim al'),
                 value: _showBudgetNotifications,
@@ -254,46 +280,74 @@ class _SettingsPageState extends State<SettingsPage> {
                   setState(() => _showBudgetNotifications = value);
                   await _saveSettings();
                 },
+                activeColor: _primaryColor,
               ),
               ListTile(
                 title: const Text('Bildirim Zamanı'),
                 subtitle: Text('Her gün ${_notificationTime.format(context)}'),
-                trailing: const Icon(Icons.access_time),
+                trailing: Icon(Icons.access_time, color: _primaryColor),
                 onTap: _selectNotificationTime,
               ),
               ListTile(
                 title: const Text('Bildirim Gün Sayısı'),
                 subtitle: Text('$_notificationDaysBefore gün önceden bildir'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove),
-                      onPressed: () async {
-                        if (_notificationDaysBefore > 1) {
-                          setState(() => _notificationDaysBefore--);
+                trailing: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[800] : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove),
+                        onPressed: () async {
+                          if (_notificationDaysBefore > 1) {
+                            setState(() => _notificationDaysBefore--);
+                            await _saveSettings();
+                          }
+                        },
+                        iconSize: 20,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          '$_notificationDaysBefore',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: () async {
+                          setState(() => _notificationDaysBefore++);
                           await _saveSettings();
-                        }
-                      },
-                    ),
-                    Text('$_notificationDaysBefore'),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: () async {
-                        setState(() => _notificationDaysBefore++);
-                        await _saveSettings();
-                      },
-                    ),
-                  ],
+                        },
+                        iconSize: 20,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
           _buildSection(
             'Görünüm Ayarları',
-            Icon(Icons.palette_outlined, color: Theme.of(context).primaryColor),
+            Icons.palette_outlined,
             [
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 title: const Text('Karanlık Tema'),
                 subtitle: const Text('Karanlık temayı kullan'),
                 value: _isDarkMode,
@@ -301,16 +355,24 @@ class _SettingsPageState extends State<SettingsPage> {
                   setState(() => _isDarkMode = value);
                   await _saveSettings();
                 },
+                activeColor: _primaryColor,
               ),
               ListTile(
                 title: const Text('Ana Renk'),
                 subtitle: const Text('Uygulamanın ana rengini değiştir'),
                 trailing: Container(
-                  width: 24,
-                  height: 24,
+                  width: 30,
+                  height: 30,
                   decoration: BoxDecoration(
                     color: _primaryColor,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _primaryColor.withOpacity(0.5),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                 ),
                 onTap: _selectPrimaryColor,
@@ -319,24 +381,38 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           _buildSection(
             'Para Birimi ve Gösterim',
-            Icon(Icons.currency_exchange,
-                color: Theme.of(context).primaryColor),
+            Icons.currency_exchange,
             [
               ListTile(
                 title: const Text('Para Birimi'),
                 subtitle: Text('Seçili: $_selectedCurrency'),
-                trailing: DropdownButton<String>(
-                  value: _selectedCurrency,
-                  onChanged: _onCurrencyChanged,
-                  items: _availableCurrencies.map((String currency) {
-                    return DropdownMenuItem<String>(
-                      value: currency,
-                      child: Text(currency),
-                    );
-                  }).toList(),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[800] : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedCurrency,
+                      onChanged: _onCurrencyChanged,
+                      items: _availableCurrencies.map((String currency) {
+                        return DropdownMenuItem<String>(
+                          value: currency,
+                          child: Text(
+                            currency,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
                 ),
               ),
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 title: const Text('Kuruş Göster'),
                 subtitle: const Text('Tutarlarda kuruşları göster'),
                 value: _showCents,
@@ -344,14 +420,15 @@ class _SettingsPageState extends State<SettingsPage> {
                   setState(() => _showCents = value);
                   await _saveSettings();
                 },
+                activeColor: _primaryColor,
               ),
             ],
           ),
           _buildSection(
             'Liste Görünümü',
-            Icon(Icons.list_alt, color: Theme.of(context).primaryColor),
+            Icons.list_alt,
             [
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 title: const Text('Tarihe Göre Grupla'),
                 subtitle: const Text('İşlemleri tarihlerine göre grupla'),
                 value: _groupTransactionsByDate,
@@ -359,8 +436,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   setState(() => _groupTransactionsByDate = value);
                   await _saveSettings();
                 },
+                activeColor: _primaryColor,
               ),
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 title: const Text('Notları Göster'),
                 subtitle: const Text('İşlem notlarını listede göster'),
                 value: _showTransactionNotes,
@@ -368,14 +446,15 @@ class _SettingsPageState extends State<SettingsPage> {
                   setState(() => _showTransactionNotes = value);
                   await _saveSettings();
                 },
+                activeColor: _primaryColor,
               ),
             ],
           ),
           _buildSection(
             'Gizlilik',
-            Icon(Icons.security, color: Theme.of(context).primaryColor),
+            Icons.security,
             [
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 title: const Text('Başlangıçta Kimlik Doğrulama'),
                 subtitle:
                     const Text('Uygulama açılışında kimlik doğrulama iste'),
@@ -384,8 +463,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   setState(() => _requireAuthenticationOnStart = value);
                   await _saveSettings();
                 },
+                activeColor: _primaryColor,
               ),
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 title: const Text('Tutarları Gizle'),
                 subtitle: const Text('Tüm tutarları "*****" olarak göster'),
                 value: _hideAmounts,
@@ -393,27 +473,48 @@ class _SettingsPageState extends State<SettingsPage> {
                   setState(() => _hideAmounts = value);
                   await _saveSettings();
                 },
+                activeColor: _primaryColor,
               ),
             ],
           ),
           _buildSection(
             'Hakkında',
-            Icon(Icons.info_outline, color: Theme.of(context).primaryColor),
+            Icons.info_outline,
             [
               ListTile(
                 title: const Text('Uygulama Versiyonu'),
                 subtitle: const Text('1.0.0'),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[800] : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Beta',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
               ),
               ListTile(
                 title: const Text('Bildirimleri Sıfırla'),
                 subtitle:
                     const Text('Tüm bildirimleri temizle ve yeniden planla'),
-                trailing: const Icon(Icons.refresh),
+                trailing: Icon(Icons.refresh, color: _primaryColor),
                 onTap: () async {
                   await NotificationService.instance.cancelAllNotifications();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Bildirimler sıfırlandı')),
+                      SnackBar(
+                        content: const Text('Bildirimler sıfırlandı'),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
                     );
                   }
                 },
@@ -425,29 +526,36 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildSection(String title, Icon icon, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
-            children: [
-              icon,
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+  Widget _buildSection(String title, IconData iconData, List<Widget> children) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Icon(iconData, color: _primaryColor),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        ...children,
-        const Divider(),
-      ],
+          ...children,
+          const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 }
