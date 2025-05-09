@@ -182,7 +182,10 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.notifications),
+            Image.asset(
+              'assets/logo.png',
+              height: 24,
+            ),
             const SizedBox(width: 8),
             const Text('Bildirimler'),
           ],
