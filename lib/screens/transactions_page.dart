@@ -624,26 +624,74 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Future<void> _showCreditActionDialog(FinanceTransaction transaction) async {
+    // Tekrarlayan işlem mi kontrol et
+    bool isRecurring = transaction.recurringType != RecurringType.none ||
+        transaction.parentTransactionId != null;
+
+    bool applyToAll = false;
+
     final bool? result = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Alacak Durumu'),
-          content: Text(transaction.isReceived
-              ? '${transaction.title} alacağını tahsil edilmedi olarak işaretlemek istiyor musunuz?'
-              : '${transaction.title} alacağı tahsil edildi mi?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('İptal'),
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Alacak Durumu'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(transaction.isReceived
+                    ? '${transaction.title} alacağını tahsil edilmedi olarak işaretlemek istiyor musunuz?'
+                    : '${transaction.title} alacağı tahsil edildi mi?'),
+                if (isRecurring) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: applyToAll,
+                        onChanged: (value) {
+                          setState(() {
+                            applyToAll = value ?? false;
+                          });
+                        },
+                      ),
+                      Expanded(
+                        child: Text(
+                          'Önceki tekrarlanan işlemlere de uygula',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Bu seçenek, bu işlem tarihinden önceki tüm tekrarlanan işlemleri aynı şekilde işaretleyecektir.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(
-                  transaction.isReceived ? 'Tahsil Edilmedi' : 'Tahsil Edildi'),
-            ),
-          ],
-        );
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('İptal'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(transaction.isReceived
+                    ? 'Tahsil Edilmedi'
+                    : 'Tahsil Edildi'),
+              ),
+            ],
+          );
+        });
       },
     );
 
@@ -653,11 +701,24 @@ class _TransactionsPageState extends State<TransactionsPage> {
       } else {
         await DatabaseHelper.instance.markCreditAsReceived(transaction.id);
       }
+
+      // Eğer "tümüne uygula" seçeneği işaretlendiyse tekrarlanan işlemleri güncelle
+      if (applyToAll && isRecurring) {
+        await DatabaseHelper.instance.updateRecurringTransactionStatus(
+            transaction.id, !transaction.isReceived);
+      }
+
       _loadTransactions();
     }
   }
 
   Future<void> _showPaymentActionDialog(FinanceTransaction transaction) async {
+    // Tekrarlayan işlem mi kontrol et
+    bool isRecurring = transaction.recurringType != RecurringType.none ||
+        transaction.parentTransactionId != null;
+
+    bool applyToAll = false;
+
     final bool? result = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -679,20 +740,61 @@ class _TransactionsPageState extends State<TransactionsPage> {
           actionText = transaction.isPaid ? 'Ödenmedi' : 'Ödendi';
         }
 
-        return AlertDialog(
-          title: Text(title),
-          content: Text(content),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('İptal'),
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: Text(title),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(content),
+                if (isRecurring) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: applyToAll,
+                        onChanged: (value) {
+                          setState(() {
+                            applyToAll = value ?? false;
+                          });
+                        },
+                      ),
+                      Expanded(
+                        child: Text(
+                          'Önceki tekrarlanan işlemlere de uygula',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Bu seçenek, bu işlem tarihinden önceki tüm tekrarlanan işlemleri aynı şekilde işaretleyecektir.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(actionText),
-            ),
-          ],
-        );
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('İptal'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(actionText),
+              ),
+            ],
+          );
+        });
       },
     );
 
@@ -702,6 +804,13 @@ class _TransactionsPageState extends State<TransactionsPage> {
       } else {
         await DatabaseHelper.instance.markPaymentAsPaid(transaction.id);
       }
+
+      // Eğer "tümüne uygula" seçeneği işaretlendiyse tekrarlanan işlemleri güncelle
+      if (applyToAll && isRecurring) {
+        await DatabaseHelper.instance.updateRecurringTransactionStatus(
+            transaction.id, !transaction.isPaid);
+      }
+
       _loadTransactions();
     }
   }

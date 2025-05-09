@@ -726,4 +726,93 @@ class DatabaseHelper {
     return List.generate(
         maps.length, (i) => FinanceTransaction.fromMap(maps[i]));
   }
+
+  // Tekrarlayan işlemler için önceki işlemlerin durumunu güncelleme fonksiyonu
+  Future<void> updateRecurringTransactionStatus(String id, bool isPaid) async {
+    final db = await database;
+
+    // Önce mevcut işlemi al
+    final List<Map<String, dynamic>> maps = await db.query(
+      'transactions',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isEmpty) return;
+
+    final transaction = FinanceTransaction.fromMap(maps.first);
+    final now = DateTime.now();
+
+    // Eğer bu bir tekrarlayan işlem ise ve ana işlem değilse
+    if (transaction.parentTransactionId != null) {
+      // Ana işlemi bul
+      final parentMaps = await db.query(
+        'transactions',
+        where: 'id = ?',
+        whereArgs: [transaction.parentTransactionId],
+      );
+
+      if (parentMaps.isEmpty) return;
+
+      final parentTransaction = FinanceTransaction.fromMap(parentMaps.first);
+
+      // Aynı seriden önceki tarihlerde olan işlemleri bul
+      final List<Map<String, dynamic>> prevTransactions = await db.query(
+        'transactions',
+        where: '(id = ? OR parentTransactionId = ?) AND date < ? AND date > ?',
+        whereArgs: [
+          parentTransaction.id,
+          parentTransaction.id,
+          transaction.date.toIso8601String(),
+          parentTransaction.date.toIso8601String(),
+        ],
+        orderBy: 'date ASC',
+      );
+
+      // Tüm önceki tekrarlayan işlemleri aynı şekilde işaretle
+      for (var prevMap in prevTransactions) {
+        final prevTransaction = FinanceTransaction.fromMap(prevMap);
+
+        if (transaction.type == TransactionType.income ||
+            transaction.type == TransactionType.credit) {
+          // Gelir veya alacak ise, alındı durumunu güncelle
+          await db.update(
+            'transactions',
+            {
+              'isReceived': isPaid ? 1 : 0,
+              'receivedDate': isPaid ? now.toIso8601String() : null,
+            },
+            where: 'id = ?',
+            whereArgs: [prevTransaction.id],
+          );
+
+          if (transaction.type == TransactionType.credit && isPaid) {
+            // Gelir işlemi oluştur
+            final newIncome = FinanceTransaction(
+              title: 'Tahsil: ${prevTransaction.title}',
+              amount: prevTransaction.amount,
+              date: now,
+              type: TransactionType.income,
+              category: prevTransaction.category,
+              description:
+                  'Tekrarlanan alacak tahsilatı: ${prevTransaction.description ?? ""}',
+            );
+
+            await insertTransaction(newIncome);
+          }
+        } else {
+          // Gider veya ödeme ise, ödendi durumunu güncelle
+          await db.update(
+            'transactions',
+            {
+              'isPaid': isPaid ? 1 : 0,
+              'paidDate': isPaid ? now.toIso8601String() : null,
+            },
+            where: 'id = ?',
+            whereArgs: [prevTransaction.id],
+          );
+        }
+      }
+    }
+  }
 }
