@@ -22,6 +22,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
+  final GlobalKey<DashboardPageState> _dashboardKey = GlobalKey();
 
   late final List<Widget> _pages;
 
@@ -29,7 +30,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _pages = [
-      const DashboardPage(),
+      DashboardPage(key: _dashboardKey),
       const TransactionsPage(),
       const BudgetPage(),
       const NotificationTestPage(),
@@ -40,9 +41,30 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
+  void refreshNotifications() {
+    if (_dashboardKey.currentState != null) {
+      _dashboardKey.currentState!.refreshNotifications();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: _selectedIndex != 0 // Dashboard'da AppBar gösterme
+          ? AppBar(
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/logo.png',
+                    height: 30,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(_getAppBarTitle()),
+                ],
+              ),
+            )
+          : null,
       body: _pages[_selectedIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -97,5 +119,22 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  String _getAppBarTitle() {
+    switch (_selectedIndex) {
+      case 0:
+        return 'Özet';
+      case 1:
+        return 'İşlemler';
+      case 2:
+        return 'Bütçe';
+      case 3:
+        return 'Bildirimler';
+      case 4:
+        return 'Ayarlar';
+      default:
+        return 'Finance App';
+    }
   }
 }

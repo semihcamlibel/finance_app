@@ -85,6 +85,10 @@ class _FinanceAppState extends State<FinanceApp> {
           foregroundColor: Colors.white,
           elevation: 0,
           centerTitle: true,
+          titleTextStyle: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       );
       return darkTheme;
@@ -94,6 +98,20 @@ class _FinanceAppState extends State<FinanceApp> {
         colorScheme: ColorScheme.fromSeed(
           seedColor: _primaryColor,
           brightness: Brightness.light,
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: AppTheme.darkGreyColor,
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.darkGreyColor,
+          ),
+          iconTheme: IconThemeData(
+            color: _primaryColor,
+          ),
         ),
       );
     }

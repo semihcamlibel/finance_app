@@ -11,18 +11,20 @@ class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  State<DashboardPage> createState() => DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class DashboardPageState extends State<DashboardPage> {
   late NumberFormat currencyFormat;
   String _selectedCurrency = '₺';
   bool _hideAmounts = false;
+  int _notificationCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadNotificationCount();
   }
 
   Future<void> _loadSettings() async {
@@ -32,6 +34,57 @@ class _DashboardPageState extends State<DashboardPage> {
       currencyFormat = DatabaseHelper.getCurrencyFormat(_selectedCurrency);
       _hideAmounts = prefs.getBool('hideAmounts') ?? false;
     });
+  }
+
+  Future<void> _loadNotificationCount() async {
+    // Bekleyen ödemeleri al
+    final upcomingPayments = await _getUpcomingPaymentCount();
+
+    // Gecikmiş ödemeleri al
+    final overduePayments = await _getOverduePaymentCount();
+
+    // Bütçe aşımı bildirimlerini al
+    final budgetAlerts = await _getBudgetAlertCount();
+
+    setState(() {
+      _notificationCount = upcomingPayments + overduePayments + budgetAlerts;
+    });
+  }
+
+  Future<int> _getUpcomingPaymentCount() async {
+    final unpaidExpenses = await DatabaseHelper.instance.getUnpaidExpenses();
+    final now = DateTime.now();
+
+    return unpaidExpenses
+        .where((transaction) =>
+            transaction.date.isAfter(now) &&
+            transaction.date.difference(now).inDays <= 7)
+        .length;
+  }
+
+  Future<int> _getOverduePaymentCount() async {
+    final unpaidExpenses = await DatabaseHelper.instance.getUnpaidExpenses();
+    final now = DateTime.now();
+
+    return unpaidExpenses
+        .where((transaction) => transaction.date.isBefore(now))
+        .length;
+  }
+
+  Future<int> _getBudgetAlertCount() async {
+    final now = DateTime.now();
+    final currentMonth = now.month;
+    final currentYear = now.year;
+
+    final overBudgetCategories = await DatabaseHelper.instance
+        .getOverBudgetCategories(currentMonth, currentYear);
+
+    return overBudgetCategories.length;
+  }
+
+  // Bildirim sayısını yeniden yükle
+  void refreshNotifications() {
+    _loadNotificationCount();
   }
 
   @override
@@ -87,19 +140,53 @@ class _DashboardPageState extends State<DashboardPage> {
                     MaterialPageRoute(
                       builder: (context) => const NotificationsListPage(),
                     ),
-                  );
+                  ).then((_) {
+                    // Bildirimler sayfasından dönünce sayımı güncelle
+                    _loadNotificationCount();
+                  });
                 },
-                child: Container(
-                  height: 40,
-                  width: 40,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.notifications_none_outlined,
-                    color: AppTheme.primaryColor,
-                  ),
+                child: Stack(
+                  children: [
+                    Container(
+                      height: 40,
+                      width: 40,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.notifications_none_outlined,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                    if (_notificationCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.errorColor,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          child: Text(
+                            _notificationCount > 9
+                                ? '9+'
+                                : _notificationCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],

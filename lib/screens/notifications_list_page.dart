@@ -179,7 +179,17 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bildirimler'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/logo.png',
+              height: 24,
+            ),
+            const SizedBox(width: 8),
+            const Text('Bildirimler'),
+          ],
+        ),
         centerTitle: true,
         actions: [
           IconButton(
