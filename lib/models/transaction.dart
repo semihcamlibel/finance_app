@@ -44,6 +44,7 @@ class FinanceTransaction {
   final int? recurringCount; // Tekrar sayısı (null ise süresiz)
   final int? remainingRecurrences; // Kalan tekrar sayısı
   final String? parentTransactionId; // Tekrarlayan işlemin ana işlem ID'si
+  final String? accountId; // İşlemin hangi hesaba ait olduğu
 
   FinanceTransaction({
     String? id,
@@ -62,6 +63,7 @@ class FinanceTransaction {
     this.recurringCount,
     this.remainingRecurrences,
     this.parentTransactionId,
+    this.accountId,
   }) : id = id ?? const Uuid().v4();
 
   // isCredit getter'ı
@@ -88,6 +90,7 @@ class FinanceTransaction {
       'recurringCount': recurringCount,
       'remainingRecurrences': remainingRecurrences,
       'parentTransactionId': parentTransactionId,
+      'accountId': accountId,
     };
   }
 
@@ -112,6 +115,7 @@ class FinanceTransaction {
       recurringCount: map['recurringCount'],
       remainingRecurrences: map['remainingRecurrences'],
       parentTransactionId: map['parentTransactionId'],
+      accountId: map['accountId'],
     );
   }
 
@@ -132,6 +136,7 @@ class FinanceTransaction {
     int? recurringCount,
     int? remainingRecurrences,
     String? parentTransactionId,
+    String? accountId,
   }) {
     return FinanceTransaction(
       id: id ?? this.id,
@@ -150,6 +155,7 @@ class FinanceTransaction {
       recurringCount: recurringCount ?? this.recurringCount,
       remainingRecurrences: remainingRecurrences ?? this.remainingRecurrences,
       parentTransactionId: parentTransactionId ?? this.parentTransactionId,
+      accountId: accountId ?? this.accountId,
     );
   }
 }

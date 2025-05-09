@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/transaction.dart';
+import '../models/account.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
@@ -22,7 +23,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -60,6 +61,30 @@ class DatabaseHelper {
         ALTER TABLE transactions ADD COLUMN parentTransactionId TEXT
       ''');
     }
+    if (oldVersion < 5) {
+      // Accounts tablosunu ekle
+      await db.execute('''
+        CREATE TABLE accounts (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          bankName TEXT NOT NULL,
+          balance REAL NOT NULL,
+          accountNumber TEXT,
+          iban TEXT,
+          description TEXT,
+          iconName TEXT,
+          colorValue INTEGER NOT NULL,
+          isActive INTEGER DEFAULT 1,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT
+        )
+      ''');
+
+      // İşlemlere account_id alanı ekle
+      await db.execute('''
+        ALTER TABLE transactions ADD COLUMN accountId TEXT
+      ''');
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -80,7 +105,8 @@ class DatabaseHelper {
         recurringType INTEGER DEFAULT 0,
         recurringCount INTEGER,
         remainingRecurrences INTEGER,
-        parentTransactionId TEXT
+        parentTransactionId TEXT,
+        accountId TEXT
       )
     ''');
 
@@ -93,6 +119,23 @@ class DatabaseHelper {
         year INTEGER NOT NULL
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE accounts (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        bankName TEXT NOT NULL,
+        balance REAL NOT NULL,
+        accountNumber TEXT,
+        iban TEXT,
+        description TEXT,
+        iconName TEXT,
+        colorValue INTEGER NOT NULL,
+        isActive INTEGER DEFAULT 1,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT
+      )
+    ''');
   }
 
   // İşlem ekleme
@@ -100,17 +143,30 @@ class DatabaseHelper {
     final db = await database;
     await db.insert('transactions', transaction.toMap());
 
-    // Eğer yeni bir alacak işlemi ise, otomatik olarak gider olarak da ekle
-    if (transaction.type == TransactionType.credit) {
+    // Eğer yeni bir alacak işlemi ise ve alındı olarak işaretlenmişse gelir olarak da ekle
+    if (transaction.type == TransactionType.credit && transaction.isReceived) {
       final expenseTransaction = FinanceTransaction(
-        title: 'Verilen: ${transaction.title}',
+        title: 'Tahsil: ${transaction.title}',
         amount: transaction.amount,
-        date: transaction.date,
-        type: TransactionType.expense,
+        date: transaction.receivedDate ?? DateTime.now(),
+        type: TransactionType.income,
         category: transaction.category,
-        description: 'Verilen borç: ${transaction.description ?? ""}',
+        description: 'Tahsil edilen alacak: ${transaction.description ?? ""}',
       );
       await db.insert('transactions', expenseTransaction.toMap());
+    }
+
+    // Eğer yeni bir borç işlemi ise ve ödendi olarak işaretlenmişse gider olarak da ekle
+    if (transaction.type == TransactionType.debt && transaction.isPaid) {
+      final incomeTransaction = FinanceTransaction(
+        title: 'Ödenen: ${transaction.title}',
+        amount: -transaction.amount, // Gider olduğu için negatif değer
+        date: transaction.paidDate ?? DateTime.now(),
+        type: TransactionType.expense,
+        category: transaction.category,
+        description: 'Ödenen borç: ${transaction.description ?? ""}',
+      );
+      await db.insert('transactions', incomeTransaction.toMap());
     }
 
     return transaction.id;
@@ -173,26 +229,20 @@ class DatabaseHelper {
   // Toplam gelir hesaplama
   Future<double> getTotalIncome() async {
     final db = await database;
-    final now = DateTime.now().toIso8601String();
     final result = await db.rawQuery('''
       SELECT SUM(amount) as total FROM transactions 
-      WHERE type = ? AND (
-        (isPaid = 1) OR 
-        (date <= ? AND recurringType = 0)
-      )
-    ''', [TransactionType.income.index, now]);
+      WHERE type = ?
+    ''', [TransactionType.income.index]);
     return result.first['total'] as double? ?? 0.0;
   }
 
   // Toplam gider hesaplama (ödenmiş ödemeler ve giderler dahil)
   Future<double> getTotalExpense() async {
     final db = await database;
-    final now = DateTime.now().toIso8601String();
     final result = await db.rawQuery('''
       SELECT SUM(amount) as total FROM transactions 
-      WHERE (type = ? AND (isPaid = 1 OR date <= ?)) 
-      OR (type = ? AND isPaid = 1)
-    ''', [TransactionType.expense.index, now, TransactionType.payment.index]);
+      WHERE ((type = ? OR type = ?) AND isPaid = 1)
+    ''', [TransactionType.expense.index, TransactionType.payment.index]);
     return result.first['total'] as double? ?? 0.0;
   }
 
@@ -257,7 +307,7 @@ class DatabaseHelper {
         description: 'Alacak tahsilatı: ${transaction.description ?? ""}',
       );
 
-      await insertTransaction(newIncome);
+      await db.insert('transactions', newIncome.toMap());
     }
   }
 
@@ -286,23 +336,7 @@ class DatabaseHelper {
         whereArgs: [id],
       );
 
-      // İlgili tahsilat gelir kaydını bul ve sil
-      final relatedIncomeMaps = await db.query(
-        'transactions',
-        where: 'title = ? AND type = ?',
-        whereArgs: [
-          'Tahsil: ${transaction.title}',
-          TransactionType.income.index
-        ],
-      );
-
-      if (relatedIncomeMaps.isNotEmpty) {
-        await db.delete(
-          'transactions',
-          where: 'id = ?',
-          whereArgs: [relatedIncomeMaps.first['id']],
-        );
-      }
+      // İlgili gelir tahsilat kaydını sildik, artık silmiyoruz
     }
   }
 
@@ -330,32 +364,60 @@ class DatabaseHelper {
         maps.length, (i) => FinanceTransaction.fromMap(maps[i]));
   }
 
-  // Ödeme işaretleme metodları
+  // Gider işlemlerini ödendi/ödenmedi işaretleme metodları
   Future<void> markPaymentAsPaid(String id) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
-    await db.update(
+
+    // Önce mevcut işlemi al
+    final List<Map<String, dynamic>> maps = await db.query(
       'transactions',
-      {
-        'isPaid': 1,
-        'paidDate': now,
-      },
       where: 'id = ?',
       whereArgs: [id],
     );
+
+    if (maps.isNotEmpty) {
+      final transaction = FinanceTransaction.fromMap(maps.first);
+
+      // İşlemi güncelle
+      await db.update(
+        'transactions',
+        {
+          'isPaid': 1,
+          'paidDate': now,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      // Gider işlemi oluşturma kısmını kaldırdık (varlık direkt değişmeyecek)
+    }
   }
 
   Future<void> markPaymentAsUnpaid(String id) async {
     final db = await database;
-    await db.update(
+
+    // Önce mevcut işlemi al
+    final List<Map<String, dynamic>> maps = await db.query(
       'transactions',
-      {
-        'isPaid': 0,
-        'paidDate': null,
-      },
       where: 'id = ?',
       whereArgs: [id],
     );
+
+    if (maps.isNotEmpty) {
+      // İşlemi güncelle
+      await db.update(
+        'transactions',
+        {
+          'isPaid': 0,
+          'paidDate': null,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      // İlgili gider kaydını sildik, artık silmiyoruz
+    }
   }
 
   // Ödenmemiş giderleri getir
@@ -1005,5 +1067,100 @@ class DatabaseHelper {
         }
       }
     }
+  }
+
+  // HESAP/KASA İŞLEMLERİ
+
+  // Hesap ekleme
+  Future<String> insertAccount(Account account) async {
+    final db = await database;
+    await db.insert('accounts', account.toMap());
+    return account.id;
+  }
+
+  // Hesap güncelleme
+  Future<int> updateAccount(Account account) async {
+    final db = await database;
+    final updatedAccount = account.copyWith(
+      updatedAt: DateTime.now(),
+    );
+    return db.update(
+      'accounts',
+      updatedAccount.toMap(),
+      where: 'id = ?',
+      whereArgs: [account.id],
+    );
+  }
+
+  // Hesap silme
+  Future<int> deleteAccount(String id) async {
+    final db = await database;
+    return await db.delete(
+      'accounts',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // Tüm hesapları getir
+  Future<List<Account>> getAllAccounts() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('accounts');
+    return List.generate(maps.length, (i) => Account.fromMap(maps[i]));
+  }
+
+  // Aktif hesapları getir
+  Future<List<Account>> getActiveAccounts() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'accounts',
+      where: 'isActive = ?',
+      whereArgs: [1],
+    );
+    return List.generate(maps.length, (i) => Account.fromMap(maps[i]));
+  }
+
+  // Hesap bakiyesini güncelleme
+  Future<int> updateAccountBalance(String id, double newBalance) async {
+    final db = await database;
+    return db.update(
+      'accounts',
+      {
+        'balance': newBalance,
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // ID'ye göre hesap getir
+  Future<Account?> getAccountById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'accounts',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isEmpty) {
+      return null;
+    }
+
+    return Account.fromMap(maps.first);
+  }
+
+  // Hesaba ait işlemleri getir
+  Future<List<FinanceTransaction>> getTransactionsByAccount(
+      String accountId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'transactions',
+      where: 'accountId = ?',
+      whereArgs: [accountId],
+      orderBy: 'date DESC',
+    );
+    return List.generate(
+        maps.length, (i) => FinanceTransaction.fromMap(maps[i]));
   }
 }
