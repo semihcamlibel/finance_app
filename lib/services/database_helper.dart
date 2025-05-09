@@ -970,8 +970,13 @@ class DatabaseHelper {
       final budget = budgets[category] ?? 0;
       final expense = transactions
           .where((t) =>
-              t.type == TransactionType.expense && t.category == category)
-          .fold(0.0, (sum, t) => sum + t.amount);
+              (t.type == TransactionType.expense ||
+                  t.type == TransactionType.payment) &&
+              t.category == category)
+          .fold(
+              0.0,
+              (sum, t) =>
+                  sum + t.amount.abs()); // Her zaman pozitif değerleri topla
 
       if (expense > budget) {
         overBudgetCategories.add({
@@ -1213,6 +1218,23 @@ class DatabaseHelper {
       'transactions',
       where: 'accountId = ?',
       whereArgs: [accountId],
+      orderBy: 'date DESC',
+    );
+    return List.generate(
+        maps.length, (i) => FinanceTransaction.fromMap(maps[i]));
+  }
+
+  // Belirli bir tarih aralığına göre işlemleri getirme
+  Future<List<FinanceTransaction>> getTransactionsByDateRange(
+      DateTime startDate, DateTime endDate) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'transactions',
+      where: 'date >= ? AND date <= ?',
+      whereArgs: [
+        startDate.toIso8601String(),
+        endDate.toIso8601String(),
+      ],
       orderBy: 'date DESC',
     );
     return List.generate(

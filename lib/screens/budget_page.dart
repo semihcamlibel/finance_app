@@ -124,15 +124,20 @@ class _BudgetPageState extends State<BudgetPage> {
 
     final Map<TransactionCategory, double> expenses = {};
     for (var transaction in transactions) {
-      if (transaction.type == TransactionType.expense) {
+      if (transaction.type == TransactionType.expense ||
+          transaction.type == TransactionType.payment) {
+        final amount = transaction.amount.abs(); // Her zaman pozitif değeri al
         expenses[transaction.category] =
-            (expenses[transaction.category] ?? 0) + transaction.amount;
+            (expenses[transaction.category] ?? 0) + amount;
       }
     }
 
     setState(() {
       _expenses = expenses;
     });
+
+    // Veri tekrar yüklendikten sonra bütçe aşımlarını kontrol et
+    _checkBudgetOverruns();
   }
 
   void _showAddBudgetDialog(TransactionCategory category) {
