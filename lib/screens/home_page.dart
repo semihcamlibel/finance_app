@@ -1,112 +1,147 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math';
+import '../theme/app_theme.dart';
 import 'dashboard_page.dart';
 import 'transactions_page.dart';
-import 'finance_page.dart';
 import 'accounts_list_page.dart';
-import 'notification_test_page.dart';
 import 'settings_page.dart';
+import 'budget_page.dart';
+import 'notification_test_page.dart';
 
 class HomePage extends StatefulWidget {
   final Function(bool) onThemeChanged;
   final Function(Color) onPrimaryColorChanged;
 
   const HomePage({
-    Key? key,
+    super.key,
     required this.onThemeChanged,
     required this.onPrimaryColorChanged,
-  }) : super(key: key);
+  });
 
   @override
-  _HomePageState createState() => _HomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   bool _refreshDashboard = false;
+  late List<Widget> _pages;
+  late Color _primaryColor;
+
+  @override
+  void initState() {
+    super.initState();
+    _primaryColor = Theme.of(context).colorScheme.primary;
+    _pages = [
+      const DashboardPage(),
+      const TransactionsPage(),
+      const AccountsListPage(),
+      // Analiz sayfası henüz tamamlanmadığı için AccountsListPage ile geçici olarak dolduralım
+      const AccountsListPage(),
+      const BudgetPage(),
+    ];
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _primaryColor = Theme.of(context).colorScheme.primary;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_getScreenTitle()),
-        actions: [
-          // Bildirimleri test etme sayfasına yönlendirme butonu
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const NotificationTestPage(),
-                ),
-              );
-            },
-          )
-        ],
+        title: Text(_getAppBarTitle()),
+        centerTitle: true,
+        elevation: 0,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
       ),
       drawer: _buildDrawer(context),
       body: IndexedStack(
         index: _selectedIndex,
-        children: [
-          DashboardPage(),
-          const TransactionsPage(),
-          const FinancePage(),
-          const AccountsListPage(),
-        ],
+        children: _pages,
       ),
-      floatingActionButton:
-          _selectedIndex == 1 ? _buildFloatingActionButton() : null,
+      floatingActionButton: _buildFloatingActionButton(),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
-  String _getScreenTitle() {
+  String _getAppBarTitle() {
     switch (_selectedIndex) {
       case 0:
-        return 'Finans Takip';
+        return 'Finansal Durum';
       case 1:
         return 'İşlemler';
       case 2:
-        return 'Finans Analizi';
-      case 3:
         return 'Hesaplar / Kasalar';
+      case 3:
+        return 'Analiz';
+      case 4:
+        return 'Bütçe';
       default:
         return 'Finans Takip';
     }
   }
 
   Widget _buildBottomNavigationBar() {
-    return BottomNavigationBar(
-      currentIndex: _selectedIndex,
-      type: BottomNavigationBarType.fixed,
-      onTap: _onItemTapped,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.dashboard),
-          label: 'Özet',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.swap_horiz),
-          label: 'İşlemler',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.analytics),
-          label: 'Finansal',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.account_balance_wallet),
-          label: 'Hesaplar',
-        ),
-      ],
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Theme.of(context).cardColor,
+        selectedItemColor: _primaryColor,
+        unselectedItemColor: Colors.grey,
+        showUnselectedLabels: true,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard_outlined),
+            activeIcon: Icon(Icons.dashboard),
+            label: 'Özet',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.receipt_long_outlined),
+            activeIcon: Icon(Icons.receipt_long),
+            label: 'İşlemler',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.account_balance_outlined),
+            activeIcon: Icon(Icons.account_balance),
+            label: 'Hesaplar',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart_outlined),
+            activeIcon: Icon(Icons.bar_chart),
+            label: 'Analiz',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calculate_outlined),
+            activeIcon: Icon(Icons.calculate),
+            label: 'Bütçe',
+          ),
+        ],
+      ),
     );
-  }
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
   }
 
   Widget _buildFloatingActionButton() {

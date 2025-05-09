@@ -3,9 +3,11 @@ import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/database_helper.dart';
 import '../models/transaction.dart';
+import '../models/account.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import 'notifications_list_page.dart';
+import '../services/currency_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -19,12 +21,23 @@ class DashboardPageState extends State<DashboardPage> {
   String _selectedCurrency = '₺';
   bool _hideAmounts = false;
   int _notificationCount = 0;
+  bool _isLoadingCurrencies = true;
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
-    _loadNotificationCount();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    // Kurları başlangıçta yükle
+    setState(() => _isLoadingCurrencies = true);
+    await CurrencyService.instance.initializeRates();
+
+    await _loadSettings();
+    await _loadNotificationCount();
+
+    setState(() => _isLoadingCurrencies = false);
   }
 
   Future<void> _loadSettings() async {
@@ -204,7 +217,8 @@ class DashboardPageState extends State<DashboardPage> {
     return FutureBuilder<Map<String, double>>(
       future: _getFinancialSummary(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            _isLoadingCurrencies) {
           return const Padding(
             padding: EdgeInsets.all(24.0),
             child: Center(
@@ -218,10 +232,8 @@ class DashboardPageState extends State<DashboardPage> {
         }
 
         final data = snapshot.data!;
-        final netWorth = (data['income']! -
-            data['expense']! +
-            data['credit']! -
-            data['debt']!);
+        // Net değeri ve hesap bakiyelerini de içeren toplam varlık
+        final netWorth = data['netWorth']!;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -229,7 +241,7 @@ class DashboardPageState extends State<DashboardPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
-              _buildMainBalanceCard(netWorth),
+              _buildMainBalanceCard(netWorth, data['accountsTotal'] ?? 0),
               const SizedBox(height: 24),
               Text(
                 'Genel Bakış',
@@ -366,7 +378,7 @@ class DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildMainBalanceCard(double balance) {
+  Widget _buildMainBalanceCard(double balance, double accountsTotal) {
     final isPositive = balance >= 0;
     final color = isPositive ? AppTheme.incomeColor : AppTheme.expenseColor;
 
@@ -446,6 +458,23 @@ class DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ),
+            const SizedBox(height: 5),
+            // Hesaplarda bulunan toplam miktar
+            if (accountsTotal > 0)
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _hideAmounts
+                      ? '****'
+                      : 'Hesaplarda: ${currencyFormat.format(accountsTotal)}',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontWeight: FontWeight.normal,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
             const SizedBox(height: 20),
             Row(
               children: [
@@ -969,33 +998,50 @@ class DashboardPageState extends State<DashboardPage> {
 
   Future<Map<String, double>> _getFinancialSummary() async {
     final transactions = await DatabaseHelper.instance.getAllTransactions();
+    final accounts = await DatabaseHelper.instance.getAllAccounts();
 
     double income = 0;
     double expense = 0;
-    double credit = 0;
-    double debt = 0;
+    double credit = await DatabaseHelper.instance.getTotalCredit();
+    double debt = await DatabaseHelper.instance.getTotalDebt();
+    double accountsTotal = 0;
 
+    // Varlık hesaplama mantığı
     for (var transaction in transactions) {
-      if (transaction.amount >= 0) {
+      if (transaction.type == TransactionType.income) {
         income += transaction.amount;
-      } else {
-        expense += transaction.amount.abs();
-      }
-
-      if (transaction.isCredit && !transaction.isPaid) {
-        credit += transaction.amount.abs();
-      }
-
-      if (transaction.isDebt && !transaction.isPaid) {
-        debt += transaction.amount.abs();
+      } else if (transaction.type == TransactionType.expense ||
+          transaction.type == TransactionType.payment) {
+        if (transaction.isPaid) {
+          // Sadece ödenmiş giderleri dahil et
+          expense += transaction.amount.abs();
+        }
       }
     }
+
+    // Hesapları kullanıcının seçtiği para birimine çevir ve topla
+    if (accounts.isNotEmpty) {
+      for (var account in accounts) {
+        if (account.isActive) {
+          // Hesap bakiyesini kullanıcının seçtiği para birimine çevir
+          double convertedBalance = CurrencyService.instance
+              .convertAccountBalance(
+                  account.balance, account.currency, _selectedCurrency);
+          accountsTotal += convertedBalance;
+        }
+      }
+    }
+
+    // Net toplam varlık: İşlemlerden gelen net değer + hesaplardaki toplam bakiye
+    double netWorth = (income - expense + credit - debt + accountsTotal);
 
     return {
       'income': income,
       'expense': expense,
       'credit': credit,
       'debt': debt,
+      'accountsTotal': accountsTotal,
+      'netWorth': netWorth,
     };
   }
 }
