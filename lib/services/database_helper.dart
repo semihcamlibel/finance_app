@@ -23,7 +23,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -85,6 +85,12 @@ class DatabaseHelper {
         ALTER TABLE transactions ADD COLUMN accountId TEXT
       ''');
     }
+    if (oldVersion < 6) {
+      // Accounts tablosuna currency sütunu ekle
+      await db.execute('''
+        ALTER TABLE accounts ADD COLUMN currency TEXT DEFAULT '₺'
+      ''');
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -133,7 +139,8 @@ class DatabaseHelper {
         colorValue INTEGER NOT NULL,
         isActive INTEGER DEFAULT 1,
         createdAt TEXT NOT NULL,
-        updatedAt TEXT
+        updatedAt TEXT,
+        currency TEXT DEFAULT '₺'
       )
     ''');
   }

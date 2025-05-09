@@ -27,6 +27,8 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
   int _selectedColor = Colors.blue.value;
   bool _isActive = true;
   bool _isEditing = false;
+  String _selectedCurrency = '₺';
+  final List<String> _availableCurrencies = ['₺', '\$', '€', '£', '¥'];
 
   @override
   void initState() {
@@ -44,6 +46,7 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
       _selectedIcon = widget.account!.iconName ?? 'wallet';
       _selectedColor = widget.account!.colorValue;
       _isActive = widget.account!.isActive;
+      _selectedCurrency = widget.account!.currency;
     }
   }
 
@@ -139,6 +142,79 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+
+              // Para Birimi
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade400),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.currency_exchange, color: Colors.grey),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Para Birimi *',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _selectedCurrency,
+                              onChanged: (String? newValue) {
+                                setState(() {
+                                  _selectedCurrency = newValue!;
+                                });
+                              },
+                              items: _availableCurrencies
+                                  .map<DropdownMenuItem<String>>(
+                                      (String value) {
+                                String currencyName = '';
+
+                                // Para birimi adlarını göster
+                                switch (value) {
+                                  case '₺':
+                                    currencyName = 'Türk Lirası (₺)';
+                                    break;
+                                  case '\$':
+                                    currencyName = 'Amerikan Doları (\$)';
+                                    break;
+                                  case '€':
+                                    currencyName = 'Euro (€)';
+                                    break;
+                                  case '£':
+                                    currencyName = 'İngiliz Sterlini (£)';
+                                    break;
+                                  case '¥':
+                                    currencyName = 'Japon Yeni (¥)';
+                                    break;
+                                  default:
+                                    currencyName = value;
+                                }
+
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(currencyName),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -418,6 +494,7 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
             iconName: _selectedIcon,
             colorValue: _selectedColor,
             isActive: _isActive,
+            currency: _selectedCurrency,
             updatedAt: DateTime.now(),
           );
 
@@ -442,6 +519,7 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
             iconName: _selectedIcon,
             colorValue: _selectedColor,
             isActive: _isActive,
+            currency: _selectedCurrency,
           );
 
           await DatabaseHelper.instance.insertAccount(newAccount);

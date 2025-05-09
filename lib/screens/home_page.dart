@@ -169,7 +169,15 @@ class _HomePageState extends State<HomePage> {
             title: const Text('Ayarlar'),
             onTap: () {
               Navigator.pop(context);
-              // Ayarlar sayfasına yönlendir
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsPage(
+                    onThemeChanged: widget.onThemeChanged,
+                    onPrimaryColorChanged: widget.onPrimaryColorChanged,
+                  ),
+                ),
+              );
             },
           ),
           ListTile(

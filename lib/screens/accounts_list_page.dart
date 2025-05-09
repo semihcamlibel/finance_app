@@ -3,6 +3,7 @@ import '../models/account.dart';
 import '../services/database_helper.dart';
 import '../theme/app_theme.dart';
 import 'account_detail_page.dart';
+import 'package:intl/intl.dart';
 
 class AccountsListPage extends StatefulWidget {
   const AccountsListPage({Key? key}) : super(key: key);
@@ -228,8 +229,7 @@ class _AccountsListPageState extends State<AccountsListPage> {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      DatabaseHelper.getCurrencyFormat(AppTheme.currencySymbol)
-                          .format(account.balance),
+                      _formatCurrency(account.balance, account.currency),
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -268,6 +268,15 @@ class _AccountsListPageState extends State<AccountsListPage> {
       default:
         return Icons.account_balance_wallet;
     }
+  }
+
+  // Hesap için bakiyeyi ve para birimini formatlayan fonksiyon
+  String _formatCurrency(double amount, String currency) {
+    return NumberFormat.currency(
+      locale: 'tr_TR',
+      symbol: currency,
+      decimalDigits: 2,
+    ).format(amount);
   }
 
   Future<void> _navigateToAccountDetail(Account? account) async {

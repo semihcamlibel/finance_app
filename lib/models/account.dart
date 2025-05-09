@@ -13,6 +13,7 @@ class Account {
   final bool isActive;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final String currency;
 
   Account({
     String? id,
@@ -25,6 +26,7 @@ class Account {
     this.iconName,
     required this.colorValue,
     this.isActive = true,
+    this.currency = '₺',
     DateTime? createdAt,
     this.updatedAt,
   })  : id = id ?? const Uuid().v4(),
@@ -44,6 +46,7 @@ class Account {
       'isActive': isActive ? 1 : 0,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'currency': currency,
     };
   }
 
@@ -59,6 +62,7 @@ class Account {
       iconName: map['iconName'],
       colorValue: map['colorValue'],
       isActive: map['isActive'] == 1,
+      currency: map['currency'] ?? '₺',
       createdAt: DateTime.parse(map['createdAt']),
       updatedAt:
           map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null,
@@ -76,6 +80,7 @@ class Account {
     String? iconName,
     int? colorValue,
     bool? isActive,
+    String? currency,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -90,6 +95,7 @@ class Account {
       iconName: iconName ?? this.iconName,
       colorValue: colorValue ?? this.colorValue,
       isActive: isActive ?? this.isActive,
+      currency: currency ?? this.currency,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
