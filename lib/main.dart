@@ -129,6 +129,7 @@ class _FinanceAppState extends State<FinanceApp> {
           themeMode: themeMode,
           themeAnimationDuration: const Duration(milliseconds: 300),
           themeAnimationCurve: Curves.easeInOut,
+          debugShowCheckedModeBanner: false,
           onGenerateRoute: (settings) {
             // Tüm sayfalar için animasyonlu geçiş uygula
             return CustomPageRoute(

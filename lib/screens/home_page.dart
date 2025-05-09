@@ -83,35 +83,52 @@ class _HomePageState extends State<HomePage> {
               _selectedIndex = index;
             });
           },
-          backgroundColor: Colors.white,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey.shade900
+              : Colors.white,
           elevation: 0,
           labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-          destinations: const [
+          destinations: [
             NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
+              icon: Icon(Icons.dashboard_outlined,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey
+                      : null),
               selectedIcon: Icon(Icons.dashboard, color: AppTheme.primaryColor),
               label: 'Özet',
             ),
             NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
+              icon: Icon(Icons.receipt_long_outlined,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey
+                      : null),
               selectedIcon:
                   Icon(Icons.receipt_long, color: AppTheme.primaryColor),
               label: 'İşlemler',
             ),
             NavigationDestination(
-              icon: Icon(Icons.account_balance_wallet_outlined),
+              icon: Icon(Icons.account_balance_wallet_outlined,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey
+                      : null),
               selectedIcon: Icon(Icons.account_balance_wallet,
                   color: AppTheme.primaryColor),
               label: 'Bütçe',
             ),
             NavigationDestination(
-              icon: Icon(Icons.notifications_outlined),
+              icon: Icon(Icons.notifications_outlined,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey
+                      : null),
               selectedIcon:
                   Icon(Icons.notifications, color: AppTheme.primaryColor),
               label: 'Bildirimler',
             ),
             NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
+              icon: Icon(Icons.settings_outlined,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey
+                      : null),
               selectedIcon: Icon(Icons.settings, color: AppTheme.primaryColor),
               label: 'Ayarlar',
             ),

@@ -19,6 +19,7 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
   bool _isLoading = true;
 
   List<NotificationItem> _notifications = [];
+  List<String> _readNotificationIds = [];
 
   @override
   void initState() {
@@ -33,7 +34,14 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
       _selectedCurrency = prefs.getString('currency') ?? '₺';
       currencyFormat = DatabaseHelper.getCurrencyFormat(_selectedCurrency);
       _hideAmounts = prefs.getBool('hideAmounts') ?? false;
+
+      // Okunmuş bildirimlerin ID listesini yükle
+      _readNotificationIds = prefs.getStringList('read_notifications') ?? [];
     });
+  }
+
+  bool isNotificationRead(String id) {
+    return _readNotificationIds.contains(id);
   }
 
   Future<void> _loadNotifications() async {
@@ -57,6 +65,14 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
         ...overduePayments,
         ...budgetAlerts
       ];
+
+      // Daha önce okunmuş bildirimleri işaretle
+      for (int i = 0; i < _notifications.length; i++) {
+        if (isNotificationRead(_notifications[i].id)) {
+          _notifications[i] = _notifications[i].copyWith(isRead: true);
+        }
+      }
+
       _notifications.sort((a, b) => b.date.compareTo(a.date)); // Yeniden eskiye
       _isLoading = false;
     });
@@ -193,12 +209,30 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.done_all),
+            onPressed: () {
+              // Tüm bildirimleri okundu olarak işaretle
+              setState(() {
+                for (int i = 0; i < _notifications.length; i++) {
+                  _notifications[i] = _notifications[i].copyWith(isRead: true);
+                }
+              });
+
+              // Bildirim durumunu sharedPreferences'a kaydet
+              _saveReadStatus();
+            },
+            tooltip: 'Tümünü Okundu İşaretle',
+          ),
+          IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: () {
               // Tüm bildirimleri temizle
               setState(() {
                 _notifications.clear();
               });
+
+              // Bildirim durumunu güncelle
+              _saveReadStatus();
             },
             tooltip: 'Tümünü Temizle',
           ),
@@ -299,6 +333,9 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
             }
           });
 
+          // Bildirim durumunu SharedPreferences'a kaydet
+          _saveReadNotification(notification.id);
+
           // Burada bildirime göre detay sayfasına yönlendirme yapılabilir
         },
         borderRadius: BorderRadius.circular(12),
@@ -372,6 +409,35 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _saveReadStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Okundu işaretli bildirimlerin ID'lerini kaydet
+    List<String> readNotificationIds = _notifications
+        .where((notification) => notification.isRead)
+        .map((notification) => notification.id)
+        .toList();
+
+    await prefs.setStringList('read_notifications', readNotificationIds);
+
+    // Navigasyon yapılırken döndürülecek değeri ayarla
+    Navigator.of(context).pop(true); // true = bildirimler güncellendi
+  }
+
+  Future<void> _saveReadNotification(String notificationId) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Mevcut okunan bildirimleri al ve yenisini ekle
+    List<String> readIds = prefs.getStringList('read_notifications') ?? [];
+    if (!readIds.contains(notificationId)) {
+      readIds.add(notificationId);
+      await prefs.setStringList('read_notifications', readIds);
+
+      // Sınıf değişkenini güncelle
+      _readNotificationIds = readIds;
+    }
   }
 }
 

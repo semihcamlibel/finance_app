@@ -140,9 +140,13 @@ class DashboardPageState extends State<DashboardPage> {
                     MaterialPageRoute(
                       builder: (context) => const NotificationsListPage(),
                     ),
-                  ).then((_) {
+                  ).then((result) {
                     // Bildirimler sayfasından dönünce sayımı güncelle
-                    _loadNotificationCount();
+                    // result == true ise bildirimler okundu demektir
+                    if (result == true) {
+                      // Bildirimleri tamamen yeniden yükle
+                      _loadNotificationCount();
+                    }
                   });
                 },
                 child: Stack(
