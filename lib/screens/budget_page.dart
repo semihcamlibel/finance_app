@@ -11,10 +11,10 @@ class BudgetPage extends StatefulWidget {
   const BudgetPage({super.key});
 
   @override
-  State<BudgetPage> createState() => _BudgetPageState();
+  BudgetPageState createState() => BudgetPageState();
 }
 
-class _BudgetPageState extends State<BudgetPage> {
+class BudgetPageState extends State<BudgetPage> {
   late NumberFormat currencyFormat =
       NumberFormat.currency(locale: 'tr_TR', symbol: '₺', decimalDigits: 2);
   String _selectedCurrency = '₺';
@@ -25,10 +25,24 @@ class _BudgetPageState extends State<BudgetPage> {
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
 
+  // Dışarıdan bütçe verilerini yenilemek için kullanılan genel metot
+  void refreshBudgetData() {
+    print('Bütçe sayfası verileri dışarıdan yenileniyor...');
+    _loadBudgetData();
+  }
+
   @override
   void initState() {
     super.initState();
-    _initializeData();
+    // Burada sadece bir kere yüklenen ayarları tutacağız
+    _loadSettings();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Bu metot, sayfa her görüntülendiğinde çağrılır
+    _loadBudgetData();
   }
 
   Future<void> _initializeData() async {

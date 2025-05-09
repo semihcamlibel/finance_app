@@ -7,6 +7,11 @@ import 'finance_page.dart';
 import 'accounts_list_page.dart';
 import 'notification_test_page.dart';
 import 'settings_page.dart';
+import 'budget_page.dart';
+
+// Bütçe sayfası için yenileme bildirimleri için GlobalKey ekleyelim
+final GlobalKey<State<BudgetPage>> budgetPageKey =
+    GlobalKey<State<BudgetPage>>();
 
 class HomePage extends StatefulWidget {
   final Function(bool) onThemeChanged;
@@ -25,6 +30,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   bool _refreshDashboard = false;
+  int _previousIndex = 0; // Son seçili sayfayı takip et
+
+  // Bütçe sayfası için GlobalKey
+  final budgetPageKey = GlobalKey<BudgetPageState>();
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +63,7 @@ class _HomePageState extends State<HomePage> {
           const TransactionsPage(),
           const FinancePage(),
           const AccountsListPage(),
+          BudgetPage(key: budgetPageKey), // Bütçe sayfasına key ekliyoruz
         ],
       ),
       floatingActionButton:
@@ -72,6 +82,8 @@ class _HomePageState extends State<HomePage> {
         return 'Finans Analizi';
       case 3:
         return 'Hesaplar / Kasalar';
+      case 4:
+        return 'Bütçe';
       default:
         return 'Finans Takip';
     }
@@ -99,12 +111,27 @@ class _HomePageState extends State<HomePage> {
           icon: Icon(Icons.account_balance_wallet),
           label: 'Hesaplar',
         ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.calculate),
+          label: 'Bütçe',
+        ),
       ],
     );
   }
 
   void _onItemTapped(int index) {
+    // Eğer kullanıcı bütçe sayfasını seçerse ve zaten bütçe sayfasında değilse
+    if (index == 4 && _selectedIndex != 4) {
+      // Sonraki frame'de bütçe sayfasını yenilemeyi planla
+      Future.microtask(() {
+        if (budgetPageKey.currentState != null) {
+          budgetPageKey.currentState!.refreshBudgetData();
+        }
+      });
+    }
+
     setState(() {
+      _previousIndex = _selectedIndex;
       _selectedIndex = index;
     });
   }
