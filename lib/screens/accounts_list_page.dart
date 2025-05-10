@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/account.dart';
 import '../services/database_helper.dart';
-import '../services/exchange_service.dart';
+import '../services/exchange_rate_service.dart';
 import '../theme/app_theme.dart';
 import 'account_detail_page.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AccountsListPage extends StatefulWidget {
   const AccountsListPage({Key? key}) : super(key: key);
@@ -17,62 +18,70 @@ class _AccountsListPageState extends State<AccountsListPage> {
   List<Account> _accounts = [];
   bool _isLoading = true;
   double _totalBalance = 0;
-  bool _isLoadingRates = false;
-  String _baseCurrency = '₺';
-  late NumberFormat _baseCurrencyFormat;
+  String _mainCurrency = '₺'; // Ana para birimi
+  Map<String, double> _convertedBalances =
+      {}; // Hesap ID'sine göre çevrilmiş bakiyeler
 
   @override
   void initState() {
     super.initState();
-    _loadBaseCurrency();
+    _loadSettings();
+    _loadAccounts();
   }
 
-  Future<void> _loadBaseCurrency() async {
-    final baseCurrency = await ExchangeService.instance.getBaseCurrency();
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _baseCurrency = baseCurrency;
-      _baseCurrencyFormat = NumberFormat.currency(
-        locale: 'tr_TR',
-        symbol: _baseCurrency,
-        decimalDigits: 2,
-      );
+      _mainCurrency = prefs.getString('currency') ?? '₺';
     });
-    _loadAccounts();
   }
 
   Future<void> _loadAccounts() async {
     setState(() {
       _isLoading = true;
-      _isLoadingRates = true;
     });
 
     try {
       final accounts = await DatabaseHelper.instance.getAllAccounts();
+
+      // Ana para birimine çevrilmiş toplam bakiyeyi hesapla
+      double total = 0;
+      _convertedBalances = {};
+
+      for (var account in accounts) {
+        if (account.isActive) {
+          double convertedBalance;
+
+          // Hesap ana para biriminde ise doğrudan ekle
+          if (account.currency == _mainCurrency) {
+            convertedBalance = account.balance;
+          } else {
+            // Farklı para biriminde ise çevir
+            convertedBalance = ExchangeRateService.instance.convertCurrency(
+              account.balance,
+              account.currency,
+              _mainCurrency,
+            );
+
+            // Debug için yazdır
+            debugPrint(
+              'Hesap ${account.name}: ${account.balance} ${account.currency} = $convertedBalance $_mainCurrency',
+            );
+          }
+
+          _convertedBalances[account.id] = convertedBalance;
+          total += convertedBalance;
+        }
+      }
+
       setState(() {
         _accounts = accounts;
-        _isLoading = false;
-      });
-
-      // Toplam bakiyeyi hesapla (tüm para birimlerini baz para birimine dönüştür)
-      final accountsData = accounts.map((account) {
-        return {
-          'balance': account.balance,
-          'currency': account.currency,
-        };
-      }).toList();
-
-      // ExchangeService ile toplam değeri hesapla
-      final total = await ExchangeService.instance
-          .convertAllAccountsToBaseCurrency(accountsData, _baseCurrency);
-
-      setState(() {
         _totalBalance = total;
-        _isLoadingRates = false;
+        _isLoading = false;
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _isLoadingRates = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Hesaplar yüklenirken hata oluştu: $e')),
@@ -168,27 +177,26 @@ class _AccountsListPageState extends State<AccountsListPage> {
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
         child: Column(
           children: [
-            Text(
-              'Toplam Varlık ($_baseCurrency)',
-              style: const TextStyle(
+            const Text(
+              'Toplam Varlık',
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
                 color: Colors.grey,
               ),
             ),
             const SizedBox(height: 8),
-            _isLoadingRates
-                ? const CircularProgressIndicator()
-                : Text(
-                    _baseCurrencyFormat.format(_totalBalance),
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+            Text(
+              DatabaseHelper.getCurrencyFormat(_mainCurrency)
+                  .format(_totalBalance),
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
-              '${_accounts.length} aktif hesap',
+              '${_accounts.where((a) => a.isActive).length} aktif hesap',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[600],
@@ -201,6 +209,9 @@ class _AccountsListPageState extends State<AccountsListPage> {
   }
 
   Widget _buildAccountCard(Account account) {
+    final convertedBalance = _convertedBalances[account.id] ?? account.balance;
+    final showConversion = account.currency != _mainCurrency;
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
       elevation: 2,
@@ -242,7 +253,7 @@ class _AccountsListPageState extends State<AccountsListPage> {
                       ),
                     ),
                     Text(
-                      account.bankName,
+                      '${account.bankName} (${account.currency})',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey[600],
@@ -265,6 +276,18 @@ class _AccountsListPageState extends State<AccountsListPage> {
                       ),
                     ),
                   ),
+                  if (showConversion)
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '≈ ${_formatCurrency(convertedBalance, _mainCurrency)}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
                   if (!account.isActive)
                     const Text(
                       'Pasif',

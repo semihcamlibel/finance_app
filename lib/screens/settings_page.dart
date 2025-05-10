@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
-import '../services/exchange_service.dart';
+import '../services/exchange_rate_service.dart';
 import 'package:intl/intl.dart';
 import 'home_page.dart';
 import '../theme/app_theme.dart';
@@ -34,8 +34,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // Currency settings
   String _selectedCurrency = '₺';
-  String _baseCurrency = '₺'; // Ana dönüşüm para birimi
-  final List<String> _availableCurrencies = ExchangeService.supportedCurrencies;
+  final List<String> _availableCurrencies = ['₺', '\$', '€', '£'];
 
   // Display settings
   bool _showCents = true;
@@ -75,7 +74,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
       // Currency settings
       _selectedCurrency = prefs.getString('currency') ?? '₺';
-      _baseCurrency = prefs.getString('baseCurrency') ?? '₺';
 
       // Display settings
       _showCents = prefs.getBool('showCents') ?? true;
@@ -107,10 +105,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
     // Currency settings
     await prefs.setString('currency', _selectedCurrency);
-    await prefs.setString('baseCurrency', _baseCurrency);
-
-    // Baz para birimini ExchangeService'e de kaydet
-    await ExchangeService.instance.saveBaseCurrency(_baseCurrency);
 
     // Display settings
     await prefs.setBool('showCents', _showCents);
@@ -217,18 +211,41 @@ class _SettingsPageState extends State<SettingsPage> {
     if (value != null) {
       setState(() => _selectedCurrency = value);
       await _saveSettings();
-      // Yeniden yükleme için ana sayfaya bildir
-      if (mounted) {
+
+      // Yeni para birimi için kurları güncelle
+      try {
+        // UI'ı engellememek için arka planda çalıştır
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Para birimi güncellendi'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+          const SnackBar(
+            content: Text('Döviz kurları güncelleniyor...'),
+            duration: Duration(seconds: 1),
           ),
         );
+
+        await ExchangeRateService.instance.fetchExchangeRates(value);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Döviz kurları güncellendi'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Döviz kurları güncellenemedi: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+
+      // Yeniden yükleme için ana sayfaya bildir
+      if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -392,7 +409,7 @@ class _SettingsPageState extends State<SettingsPage> {
             [
               ListTile(
                 title: const Text('Para Birimi'),
-                subtitle: Text('Varsayılan para birimi: $_selectedCurrency'),
+                subtitle: Text('Seçili: $_selectedCurrency'),
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
@@ -403,51 +420,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     child: DropdownButton<String>(
                       value: _selectedCurrency,
                       onChanged: _onCurrencyChanged,
-                      items: _availableCurrencies.map((String currency) {
-                        return DropdownMenuItem<String>(
-                          value: currency,
-                          child: Text(
-                            currency,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-              ),
-              ListTile(
-                title: const Text('Baz Para Birimi'),
-                subtitle: Text('Toplam değer gösterimi: $_baseCurrency'),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[800] : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _baseCurrency,
-                      onChanged: (String? newValue) async {
-                        if (newValue != null) {
-                          setState(() => _baseCurrency = newValue);
-                          await _saveSettings();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                  'Baz para birimi değiştirildi: $newValue'),
-                              duration: const Duration(seconds: 2),
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          );
-                        }
-                      },
                       items: _availableCurrencies.map((String currency) {
                         return DropdownMenuItem<String>(
                           value: currency,

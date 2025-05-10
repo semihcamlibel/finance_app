@@ -11,6 +11,7 @@ import 'screens/accounts_list_page.dart';
 import 'services/database_helper.dart';
 import 'services/notification_service.dart';
 import 'services/auth_service.dart';
+import 'services/exchange_rate_service.dart';
 import 'theme/app_theme.dart';
 
 // Yerelleştirme için yardımcı fonksiyon
@@ -49,6 +50,19 @@ void main() async {
 
   // Süresiz tekrarlanan işlemleri kontrol et ve gerekirse yeni işlemler oluştur
   await DatabaseHelper.instance.checkAndCreateFutureRecurringTransactions();
+
+  // Döviz kurları servisini başlat
+  await ExchangeRateService.instance.initialize();
+
+  // Varsayılan para birimini al ve döviz kurlarını güncelle
+  final prefs = await SharedPreferences.getInstance();
+  final defaultCurrency = prefs.getString('currency') ?? '₺';
+
+  // Arka planda kurları güncelle (uygulama akışını engellememek için)
+  ExchangeRateService.instance
+      .fetchExchangeRates(defaultCurrency)
+      .then((_) => debugPrint('Döviz kurları güncellendi'))
+      .catchError((e) => debugPrint('Döviz kurları güncellenirken hata: $e'));
 
   runApp(const FinanceApp());
 }
