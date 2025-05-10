@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/account.dart';
 import '../services/database_helper.dart';
+import '../services/exchange_service.dart';
 import '../theme/app_theme.dart';
 import 'package:flutter/services.dart';
 
@@ -28,7 +29,7 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
   bool _isActive = true;
   bool _isEditing = false;
   String _selectedCurrency = '₺';
-  final List<String> _availableCurrencies = ['₺', '\$', '€', '£', '¥'];
+  final List<String> _availableCurrencies = ExchangeService.supportedCurrencies;
 
   @override
   void initState() {

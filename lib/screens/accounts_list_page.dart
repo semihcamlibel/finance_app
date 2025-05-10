@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/account.dart';
 import '../services/database_helper.dart';
+import '../services/exchange_service.dart';
 import '../theme/app_theme.dart';
 import 'account_detail_page.dart';
 import 'package:intl/intl.dart';
@@ -16,35 +17,62 @@ class _AccountsListPageState extends State<AccountsListPage> {
   List<Account> _accounts = [];
   bool _isLoading = true;
   double _totalBalance = 0;
+  bool _isLoadingRates = false;
+  String _baseCurrency = '₺';
+  late NumberFormat _baseCurrencyFormat;
 
   @override
   void initState() {
     super.initState();
+    _loadBaseCurrency();
+  }
+
+  Future<void> _loadBaseCurrency() async {
+    final baseCurrency = await ExchangeService.instance.getBaseCurrency();
+    setState(() {
+      _baseCurrency = baseCurrency;
+      _baseCurrencyFormat = NumberFormat.currency(
+        locale: 'tr_TR',
+        symbol: _baseCurrency,
+        decimalDigits: 2,
+      );
+    });
     _loadAccounts();
   }
 
   Future<void> _loadAccounts() async {
     setState(() {
       _isLoading = true;
+      _isLoadingRates = true;
     });
 
     try {
       final accounts = await DatabaseHelper.instance.getAllAccounts();
-
-      // Toplam bakiyeyi hesapla
-      double total = 0;
-      for (var account in accounts) {
-        total += account.balance;
-      }
-
       setState(() {
         _accounts = accounts;
-        _totalBalance = total;
         _isLoading = false;
+      });
+
+      // Toplam bakiyeyi hesapla (tüm para birimlerini baz para birimine dönüştür)
+      final accountsData = accounts.map((account) {
+        return {
+          'balance': account.balance,
+          'currency': account.currency,
+        };
+      }).toList();
+
+      // ExchangeService ile toplam değeri hesapla
+      final total = await ExchangeService.instance
+          .convertAllAccountsToBaseCurrency(accountsData, _baseCurrency);
+
+      setState(() {
+        _totalBalance = total;
+        _isLoadingRates = false;
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
+        _isLoadingRates = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Hesaplar yüklenirken hata oluştu: $e')),
@@ -140,23 +168,24 @@ class _AccountsListPageState extends State<AccountsListPage> {
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
         child: Column(
           children: [
-            const Text(
-              'Toplam Varlık',
-              style: TextStyle(
+            Text(
+              'Toplam Varlık ($_baseCurrency)',
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
                 color: Colors.grey,
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              DatabaseHelper.getCurrencyFormat(AppTheme.currencySymbol)
-                  .format(_totalBalance),
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            _isLoadingRates
+                ? const CircularProgressIndicator()
+                : Text(
+                    _baseCurrencyFormat.format(_totalBalance),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
             const SizedBox(height: 8),
             Text(
               '${_accounts.length} aktif hesap',

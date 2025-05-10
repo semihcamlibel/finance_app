@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/database_helper.dart';
+import '../services/exchange_service.dart';
 import '../models/transaction.dart';
 import '../models/account.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,8 +20,10 @@ class DashboardPage extends StatefulWidget {
 class DashboardPageState extends State<DashboardPage> {
   late NumberFormat currencyFormat;
   String _selectedCurrency = '₺';
+  String _baseCurrency = '₺'; // Ana dönüşüm para birimi
   bool _hideAmounts = false;
   int _notificationCount = 0;
+  bool _isLoadingRates = false; // Döviz kurları yüklenirken gösterilecek
 
   @override
   void initState() {
@@ -31,8 +34,11 @@ class DashboardPageState extends State<DashboardPage> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    final baseCurrency = await ExchangeService.instance.getBaseCurrency();
+
     setState(() {
       _selectedCurrency = prefs.getString('currency') ?? '₺';
+      _baseCurrency = baseCurrency;
       currencyFormat = DatabaseHelper.getCurrencyFormat(_selectedCurrency);
       _hideAmounts = prefs.getBool('hideAmounts') ?? false;
     });
@@ -206,7 +212,8 @@ class DashboardPageState extends State<DashboardPage> {
     return FutureBuilder<Map<String, double>>(
       future: _getFinancialSummary(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            _isLoadingRates) {
           return const Padding(
             padding: EdgeInsets.all(24.0),
             child: Center(
@@ -407,9 +414,9 @@ class DashboardPageState extends State<DashboardPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Toplam Varlık',
-                    style: TextStyle(
+                  Text(
+                    'Toplam Varlık ($_baseCurrency)',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w500,
                       fontSize: 16,
@@ -450,7 +457,13 @@ class DashboardPageState extends State<DashboardPage> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  _hideAmounts ? '*****' : currencyFormat.format(balance),
+                  _hideAmounts
+                      ? '*****'
+                      : NumberFormat.currency(
+                              locale: 'tr_TR',
+                              symbol: _baseCurrency,
+                              decimalDigits: 2)
+                          .format(balance),
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -981,41 +994,73 @@ class DashboardPageState extends State<DashboardPage> {
   }
 
   Future<Map<String, double>> _getFinancialSummary() async {
-    final transactions = await DatabaseHelper.instance.getAllTransactions();
-    final accounts = await DatabaseHelper.instance.getAllAccounts();
+    setState(() => _isLoadingRates = true);
 
-    double income = 0;
-    double expense = 0;
-    double credit = await DatabaseHelper.instance.getTotalCredit();
-    double debt = await DatabaseHelper.instance.getTotalDebt();
-    double totalAssets = 0;
+    try {
+      final transactions = await DatabaseHelper.instance.getAllTransactions();
+      final accounts = await DatabaseHelper.instance.getAllAccounts();
 
-    // Hesaplardaki toplam varlık
-    for (var account in accounts) {
-      if (account.isActive) {
-        totalAssets += account.balance;
-      }
-    }
+      double income = 0;
+      double expense = 0;
+      double credit = await DatabaseHelper.instance.getTotalCredit();
+      double debt = await DatabaseHelper.instance.getTotalDebt();
+      double totalAssets = 0;
 
-    // Gelir/gider hesaplaması (istatistik amaçlı)
-    for (var transaction in transactions) {
-      if (transaction.type == TransactionType.income) {
-        income += transaction.amount;
-      } else if (transaction.type == TransactionType.expense ||
-          transaction.type == TransactionType.payment) {
-        if (transaction.isPaid) {
-          // Sadece ödenmiş giderleri dahil et
-          expense += transaction.amount.abs();
+      // Her hesabı baz para birimine dönüştür
+      final accountsData = accounts.map((account) {
+        return {
+          'balance': account.balance,
+          'currency': account.currency,
+        };
+      }).toList();
+
+      // ExchangeService ile toplam değeri hesapla
+      totalAssets = await ExchangeService.instance
+          .convertAllAccountsToBaseCurrency(accountsData, _baseCurrency);
+
+      // Gelir/gider hesaplaması (istatistik amaçlı)
+      for (var transaction in transactions) {
+        if (transaction.type == TransactionType.income) {
+          income += transaction.amount;
+        } else if (transaction.type == TransactionType.expense ||
+            transaction.type == TransactionType.payment) {
+          if (transaction.isPaid) {
+            // Sadece ödenmiş giderleri dahil et
+            expense += transaction.amount.abs();
+          }
         }
       }
-    }
 
-    return {
-      'income': income,
-      'expense': expense,
-      'credit': credit,
-      'debt': debt,
-      'totalAssets': totalAssets,
-    };
+      setState(() => _isLoadingRates = false);
+
+      return {
+        'income': income,
+        'expense': expense,
+        'credit': credit,
+        'debt': debt,
+        'totalAssets': totalAssets,
+      };
+    } catch (e) {
+      setState(() => _isLoadingRates = false);
+      print('Finansal özet hesaplanırken hata: $e');
+
+      // Hata durumunda basit bir toplam hesapla
+      final accounts = await DatabaseHelper.instance.getAllAccounts();
+      double totalAssets = 0;
+
+      for (var account in accounts) {
+        if (account.isActive) {
+          totalAssets += account.balance;
+        }
+      }
+
+      return {
+        'income': 0,
+        'expense': 0,
+        'credit': 0,
+        'debt': 0,
+        'totalAssets': totalAssets,
+      };
+    }
   }
 }
