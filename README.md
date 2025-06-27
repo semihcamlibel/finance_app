@@ -19,7 +19,7 @@ Kişisel finans yönetimi için geliştirilmiş bir Flutter uygulaması.
 1. Flutter'ı yükleyin (https://flutter.dev/docs/get-started/install)
 2. Projeyi klonlayın:
    ```bash
-   git clone https://github.com/KULLANICI_ADINIZ/finance_app.git
+   git clone https://github.com/semihcamlibel/finance_app.git
    ```
 3. Bağımlılıkları yükleyin:
    ```bash
